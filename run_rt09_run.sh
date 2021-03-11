@@ -1,0 +1,1 @@
+nohup ./run_rt09.sh > rt09_log.log 2>&1 &
