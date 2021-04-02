@@ -8,8 +8,9 @@ if [[ $# -ne 2 ]]; then
     exit
 fi
 
+rm -r ref sys
 mkdir -p ref/labs ref/rttm ref/wav
-rm ref/labs/* ref/rttm/* ref/wav/*
+mkdir sys
 
 fn_index=0
 for fn in $(ls ~/${dataset_name}/wav); do
