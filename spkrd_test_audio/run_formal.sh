@@ -17,11 +17,11 @@ VBHMM_FA=0.4
 VBHMM_FB=17
 VBHMM_LOOP=0.40
 
-if [[ dataset -eq 'callhome97' ]]; then
+if [[ ${dataset} == "callhome97" ]]; then
     DATA_DIR=/home/liaozty20/callhome97
-elif [[ dataset -eq 'callhome2000' ]]; then
+elif [[ ${dataset} == "callhome2000" ]]; then
     DATA_DIR=/home/liaozty20/callhome2000
-elif [[ dataset -eq 'amicorpus' ]]; then
+elif [[ ${dataset} == "amicorpus" ]]; then
     DATA_DIR=/home/liaozty20/amicorpus
     WEIGHTS_DIR=${VB_DIR}/models/ResNet101_16kHz/nnet/raw_81.pth
     XVEC_TRANS_DIR=${VB_DIR}/models/ResNet101_16kHz/transform.h5
@@ -31,9 +31,19 @@ elif [[ dataset -eq 'amicorpus' ]]; then
     VBHMM_FB=64
     VBHMM_LOOP=0.65
 else
-    echo 'Wrong dataset. Only callhome97, callhome2000, amicorpus are supported.'
+    echo "Wrong dataset. Only callhome97, callhome2000, amicorpus are supported."
     exit 1
 fi
+
+echo "Running on ${dataset}, with factor ${ffactor}"
+echo "data_dir: ${DATA_DIR}"
+echo "weights_dir: ${WEIGHTS_DIR}"
+echo "xvec_trans_dir: ${XVEC_TRANS_DIR}"
+echo "plda_dir: ${PLDA_DIR}"
+echo "regseg_end: ${REGSEG_END}"
+echo "vbhmm_Fa: ${VBHMM_FA}"
+echo "vbhmm_Fb: ${VBHMM_FB}"
+echo "vbhmm_loop: ${VBHMM_LOOP}"
 
 mkdir -p ${dataset}_sys/xvector ${dataset}_sys/seg ${dataset}_sys/rttm_ffactor_${ffactor} ${dataset}_sys/regseg
 
@@ -42,11 +52,11 @@ python3 select_reg_segs.py -i ${DATA_DIR}/rttm -o ${dataset}_sys/regseg -a regse
 for audio in $(ls ${DATA_DIR}/wav)
 do
     filename=$(echo "${audio}" | cut -f 1 -d '.')
-    echo ${filename} > list.txt
+    echo ${filename} > ${dataset}_sys_${ffactor}_list.txt
     if !([ -f ${dataset}_sys/xvector/${filename}.ark ]); then
-        echo "X-vectors Extraction Starts: "${filename}""
+        echo "X-vectors Extraction Starts: ${filename}"
         # run feature and x-vectors extraction
-        python ${VB_DIR}/predict.py --in-file-list list.txt \
+        python ${VB_DIR}/predict.py --in-file-list ${dataset}_sys_${ffactor}_list.txt \
             --in-lab-dir ${DATA_DIR}/labs \
             --in-wav-dir ${DATA_DIR}/wav \
             --out-ark-fn ${dataset}_sys/xvector/${filename}.ark \
@@ -55,10 +65,10 @@ do
             --weights ${WEIGHTS_DIR} \
             --model ResNet101 \
             --gpu $(${VB_DIR}/free_gpu.sh)
-        echo "X-vectors Extraction Ends: "${filename}""
+        echo "X-vectors Extraction Ends: ${filename}"
     fi
 
-    echo "VB-HMM Starts: "${filename}""
+    echo "VB-HMM Starts: ${filename}"
     # run variational bayes on top of x-vectors
     python ${VB_DIR}/vbhmm.py --file-name ${filename} \
         --init AHC+VB \
@@ -74,9 +84,9 @@ do
         --loopP ${VBHMM_LOOP} \
         --fusion-factor ${ffactor} \
         --reg-seg-file ${dataset}_sys/regseg/${filename}.regseg
-    echo "VB-HMM Ends: "${filename}""
+    echo "VB-HMM Ends: ${filename}"
 
-    echo "Scoring Starts: "${filename}""
+    echo "Scoring Starts: ${filename}"
     # check if there is ground truth .rttm file
     REFDIR=${DATA_DIR}/rttm/${filename}.rttm
     SYSDIR=${dataset}_sys/rttm_ffactor_${ffactor}/${filename}.rttm
@@ -90,5 +100,5 @@ do
         # # full
         python ${VB_DIR}/../dscore/score.py -r $REFDIR -s $SYSDIR --collar 0.0
     fi
-    echo "Scoring Ends: "${filename}""
+    echo "Scoring Ends: ${filename}"
 done
