@@ -11,22 +11,25 @@ for audio in $(ls ${DIR}/wav)
 do
     filename=$(echo "${audio}" | cut -f 1 -d '.')
     echo ${filename} > list.txt
-    echo "X-vectors Extraction Starts: "${filename}""
-    # run feature and x-vectors extraction
-    python ${VB_DIR}/predict.py --in-file-list list.txt \
-        --in-lab-dir ${DIR}/labs \
-        --in-wav-dir ${DIR}/wav \
-        --out-ark-fn sys/xvector/${filename}.ark \
-        --out-seg-fn sys/seg/${filename}.seg \
-        --backend pytorch \
-        --weights ${VB_DIR}/models/ResNet101_8kHz/nnet/raw_195.pth \
-        --model ResNet101 \
-        --gpu $(${VB_DIR}/free_gpu.sh)
-    echo "X-vectors Extraction Ends: "${filename}""
+    if !([ -f sys/xvector/${filename}.ark ]); then
+        echo "X-vectors Extraction Starts: "${filename}""
+        # run feature and x-vectors extraction
+        python ${VB_DIR}/predict.py --in-file-list list.txt \
+            --in-lab-dir ${DIR}/labs \
+            --in-wav-dir ${DIR}/wav \
+            --out-ark-fn sys/xvector/${filename}.ark \
+            --out-seg-fn sys/seg/${filename}.seg \
+            --backend pytorch \
+            --weights ${VB_DIR}/models/ResNet101_8kHz/nnet/raw_195.pth \
+            --model ResNet101 \
+            --gpu $(${VB_DIR}/free_gpu.sh)
+        echo "X-vectors Extraction Ends: "${filename}""
+    fi
 
     echo "VB-HMM Starts: "${filename}""
     # run variational bayes on top of x-vectors
-    python ${VB_DIR}/vbhmm.py --init AHC+VB \
+    python ${VB_DIR}/vbhmm.py --file-name ${filename} \
+        --init AHC+VB \
         --out-rttm-dir sys/rttm \
         --xvec-ark-file sys/xvector/${filename}.ark \
         --segments-file sys/seg/${filename}.seg \
@@ -36,7 +39,9 @@ do
         --lda-dim 128 \
         --Fa 0.4 \
         --Fb 17 \
-        --loopP 0.40
+        --loopP 0.40 \
+        --fusion-factor 0.05 \
+        --reg-seg-file sys/regseg/${filename}.regseg
     echo "VB-HMM Ends: "${filename}""
 
     echo "Scoring Starts: "${filename}""
@@ -47,11 +52,11 @@ do
     then
         # run dscore
         # forgiving
-        python ${VB_DIR}/../dscore/score.py -r $REFDIR -s $SYSDIR --collar 0.25 --ignore_overlaps
+        # python ${VB_DIR}/../dscore/score.py -r $REFDIR -s $SYSDIR --collar 0.25 --ignore_overlaps
         # # fair
-        # python dscore/score.py -r $REFDIR -s $SYSDIR --collar 0.25
+        # python ${VB_DIR}/../dscore/score.py -r $REFDIR -s $SYSDIR --collar 0.25
         # # full
-        # python dscore/score.py -r $REFDIR -s $SYSDIR --collar 0.0
+        python ${VB_DIR}/../dscore/score.py -r $REFDIR -s $SYSDIR --collar 0.0
     fi
     echo "Scoring Ends: "${filename}""
 done

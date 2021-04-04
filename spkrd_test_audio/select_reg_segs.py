@@ -74,9 +74,12 @@ def select_register_segments(rttm_content, start, end):
     '''
     To be continued
     '''
+    time_dur = end - start
+    rttm_start = rttm_content[0, 3].astype(float)
     rttm_duration = sum(rttm_content[-1, 3:5].astype(float))
-    end = min(end, rttm_duration)
-    assert 0 <= start < end
+    start = max(start, rttm_start)
+    end = min(start + time_dur, rttm_duration)
+    assert 0 <= start < end, 'Start is greater than end'
     rttm_reg_seg = []
     for index, rttm_row in enumerate(rttm_content):
         if rttm_row[3].astype(float) < end and \
@@ -164,8 +167,9 @@ if __name__ == '__main__':
         '-a', '--action', help='Actions: mark \
         overlappings (overlap) or select registered segments (regseg)')
     parser.add_argument(
-        '-s', '--start', help='register start', default=0)
-    parser.add_argument('-e', '--end', help='register end', default=15.0)
+        '-s', '--start', type=float, help='register start', default=0)
+    parser.add_argument(
+        '-e', '--end', type=float, help='register end', default=15.0)
     args = parser.parse_args()
 
     if not os.path.exists(args.out_dir):

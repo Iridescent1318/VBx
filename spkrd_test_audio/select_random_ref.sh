@@ -32,3 +32,5 @@ for rfn in ${rand_fn[*]}; do
     cp ~/${dataset_name}/rttm/${file_names[rfn]}.rttm ref/rttm
     cp ~/${dataset_name}/labs/${file_names[rfn]}.lab ref/labs
 done
+
+python3 select_reg_segs.py -i ref/rttm -o sys/regseg -a regseg
