@@ -31,10 +31,13 @@ import scipy.linalg as spl
 import numexpr as ne # the dependency on this modul can be avoided by replacing
                      # logsumexp_ne and exp_ne with logsumexp and np.exp
 
+from diarization_lib import cos_similarity
+
 #[gamma pi Li] =
 def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters = 10,
                    epsilon = 1e-4, loopProb = 0.99, alphaQInit = 1.0, ref=None,
-                   plot=False, minDur=1, Fa=1.0, Fb=1.0):
+                   plot=False, minDur=1, Fa=1.0, Fb=1.0, label=None,
+                   fusionFactor=0.0, plda_psi=None):
 
   """
   This is a simplified version of speaker diarization described in:
@@ -88,6 +91,46 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
     # initialize gamma from flat Dirichlet prior with concentrsaion parameter alphaQInit
     gamma = np.random.gamma(alphaQInit, size=(nframes, maxSpeakers))
     gamma = gamma / gamma.sum(1, keepdims=True)
+
+  if label is not None:
+    assert X.shape[0] == label.shape[0], 'Error: segment shape is not equal to labels'
+    registered_frames = dict()
+    for i, frame in enumerate(X):
+      if not label[i] == ' ':
+        if label[i] not in registered_frames:
+          registered_frames[label[i]] = [frame]
+        else:
+          registered_frames[label[i]].append(frame)
+    reg_frames_mean = dict()
+    reg_frames_num = dict()
+    reg_frames_plda_mean = dict()
+    reg_frames_plda_cov = dict()
+    for key, val in registered_frames.items():
+      reg_frames_mean[key] = np.sum(val, axis=0) / len(val)
+      reg_frames_num[key] = len(val)
+      if plda_psi is not None:
+        n = len(val)
+        reg_frames_plda_mean[key] = n * plda_psi / (n * plda_psi + np.ones(D)) * reg_frames_mean[key]
+        reg_frames_plda_cov[key] = np.ones(D) + plda_psi / (n * plda_psi + np.ones(D))
+    
+    for i, frame in enumerate(X):
+      if label[i] == ' ':
+        if plda_psi is None:
+          cos_sim = dict()
+          for key, val in reg_frames_mean.items():
+            cos_sim[key] = np.dot(frame, val) / (np.linalg.norm(frame) * np.linalg.norm(val))
+          fusion_label = max(cos_sim.items(), key=lambda e: e[1])[0]
+          max_cos_dist = max(cos_sim.items(), key=lambda e: e[1])[1]
+          if max_cos_dist >= 0.6:
+            X[i, :] = fusionFactor * reg_frames_mean[fusion_label] + (1 - fusionFactor) * X[i, :]
+        else:
+          plda_sim = dict()
+          for key, val in reg_frames_mean.items():
+            plda_sim[key] = normal_pdf_log(frame, reg_frames_plda_mean[key], reg_frames_plda_cov[key])
+          fusion_label = max(plda_sim.items(), key=lambda e: e[1])[0]
+          max_plda = max(plda_sim.items(), key=lambda e: e[1])[1]
+          if max_plda >= -600:
+            X[i, :] = fusionFactor * reg_frames_mean[fusion_label] + (1 - fusionFactor) * X[i, :]
 
   # calculate UBM mixture frame posteriors (i.e. per-frame zero order statistics)
   #ll = np.sum(X.dot(-0.5*iE)*X, axis=1) + m.dot(iE).dot(X.T)-0.5*(m.dot(iE).dot(m) - logdet(iE) + D*np.log(2*np.pi))
@@ -293,3 +336,12 @@ def forward_backward(lls, tr, ip):
     tll = logsumexp(lfw[-1])
     pi = np.exp(lfw + lbw - tll)
     return pi, tll, lfw, lbw
+
+
+def normal_pdf_log(x, mean, diag_cov):
+  '''
+
+  '''
+  dim = x.shape[0]
+  diag_cov_det = np.abs(np.prod(diag_cov, axis=0))
+  return - dim / 2 * np.log(2 * np.pi) - 1 / 2 * np.log(diag_cov_det) - np.dot((x - mean) / diag_cov, x - mean)
