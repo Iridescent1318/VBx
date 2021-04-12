@@ -1,0 +1,1 @@
+nohup ./run_callhome2000.sh > callhome2000_log.log 2>&1 &

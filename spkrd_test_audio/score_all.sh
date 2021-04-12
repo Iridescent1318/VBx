@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+dataset=$1
+ffactor=$2
+
+DATA_DIR=''
+VB_DIR=/home/liaozty20/VBx/VBx
+
+if [[ dataset -eq 'callhome97' ]]; then
+    DATA_DIR=/home/liaozty20/callhome97
+elif [[ dataset -eq 'callhome2000' ]]; then
+    DATA_DIR=/home/liaozty20/callhome2000
+elif [[ dataset -eq 'amicorpus' ]]; then
+    DATA_DIR=/home/liaozty20/amicorpus
+else
+    echo "Wrong dataset. Only callhome97, callhome2000, amicorpus are supported."
+    exit 1
+fi
+
+if [[ -d ${dataset}_sys/rttm_ffactor_${ffactor} ]]; then
+    mkdir -p ${dataset}_sys/result
+    SYS_RTTM_ALL=${dataset}_sys/result/${dataset}_sys_ffactor_${ffactor}_all.rttm
+    REF_RTTM_ALL=${dataset}_sys/result/${dataset}_ref_all.rttm
+    cat ${dataset}_sys/rttm_ffactor_${ffactor}/*.rttm > ${SYS_RTTM_ALL}
+    cat ${DATA_DIR}/rttm/*.rttm > ${REF_RTTM_ALL}
+    python ${VB_DIR}/../dscore/score.py --collar 0.25 --ignore_overlaps -r ${REF_RTTM_ALL} -s ${SYS_RTTM_ALL} > ${dataset}_sys/result/${dataset}_result_forgiving_${ffactor}
+    python ${VB_DIR}/../dscore/score.py --collar 0.25 -r ${REF_RTTM_ALL} -s ${SYS_RTTM_ALL} > ${dataset}_sys/result/${dataset}_result_fair_${ffactor}
+    python ${VB_DIR}/../dscore/score.py --collar 0.0 -r ${REF_RTTM_ALL} -s ${SYS_RTTM_ALL} > ${dataset}_sys/result/${dataset}_result_full_${ffactor}
+else
+    echo "${dataset}_sys/rttm_ffactor_${ffactor} not found!"
+    exit 1
+fi

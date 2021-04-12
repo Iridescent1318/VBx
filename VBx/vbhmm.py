@@ -51,11 +51,16 @@ from VB_diarization import VB_diarization
 def write_output(fp, out_labels, starts, ends):
     for label, seg_start, seg_end in zip(out_labels, starts, ends):
         fp.write(f'SPEAKER {file_name} 1 {seg_start:03f} {seg_end - seg_start:03f} '
-                 f'<NA> <NA> {label + 1} <NA> <NA>{os.linesep}')
+                 f'<NA> <NA> {label + 1 if isinstance(label, int) else label} <NA> <NA>{os.linesep}')
+
+
+def cross_interval_len(inv1, inv2):
+    return max(0, min(inv1[1], inv2[1]) - max(inv1[0], inv2[0]))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--file-name', required=True, type=str)
     parser.add_argument('--init', required=True, type=str, choices=['AHC', 'AHC+VB'],
                         help='AHC for using only AHC or AHC+VB for VB-HMM after AHC initilization', )
     parser.add_argument('--out-rttm-dir', required=True, type=str, help='Directory to store output rttm files')
@@ -83,12 +88,21 @@ if __name__ == '__main__':
                              ' smoothing. Not so important, high value (e.g. 10) is OK  => keeping hard assigment')
     parser.add_argument('--output-2nd', required=False, type=bool, default=False,
                         help='Output also second most likely speaker of VB-HMM')
+    parser.add_argument('--reg-seg-file', required=False, type=str, default=None,
+                        help='File with registered segments, including start, end time and speaker label')
+    parser.add_argument('--fusion-factor', required=False, type=float, default=0.0,
+                        help='The hyperparameter controlling fusion of xvecs')
+    parser.add_argument('--replace-label', required=False, type=bool, default=False)
 
     args = parser.parse_args()
     assert 0 <= args.loopP <= 1, f'Expecting loopP between 0 and 1, got {args.loopP} instead.'
 
     # segments file with x-vector timing information
-    segs_dict = read_xvector_timing_dict(args.segments_file)
+    segs_dict_old = read_xvector_timing_dict(args.segments_file)
+    segs_dict = segs_dict_old[args.file_name]
+    seg_to_duration_dict = dict()
+    for seg, dur in zip(segs_dict[0], segs_dict[1]):
+        seg_to_duration_dict[seg] = dur
 
     kaldi_plda = read_plda(args.plda_file)
     plda_mu, plda_tr, plda_psi = kaldi_plda
@@ -98,6 +112,14 @@ if __name__ == '__main__':
     plda_psi = acvar[::-1]
     plda_tr = wccn.T[::-1]
 
+    # read registered segments from .regseg file
+    if args.reg_seg_file:
+        reg_segs = np.loadtxt(args.reg_seg_file, dtype=str)
+        for i, rs in enumerate(reg_segs):
+            rs[1] = rs[1].astype(float) + rs[0].astype(float)
+    else:
+        print("Info: registered segments are not given")
+
     # Open ark file with x-vectors and in each iteration of the following for-loop
     # read a batch of x-vectors corresponding to one recording
     arkit = kaldi_io.read_vec_flt_ark(args.xvec_ark_file)
@@ -106,6 +128,24 @@ if __name__ == '__main__':
         print(file_name)
         seg_names, xvecs = zip(*segs)
         x = np.array(xvecs)
+
+        if args.reg_seg_file:
+            reg_label = np.array([' '] * x.shape[0])
+            for i, reg_and_seg in enumerate(zip(reg_label, seg_names)):
+                cur_label_dur = seg_to_duration_dict[reg_and_seg[1]]
+                max_dur = 0
+                max_label = ' '
+                for given_reg in reg_segs:
+                    cross_dur = cross_interval_len(
+                        [given_reg[0].astype(float), given_reg[1].astype(float)],
+                        [cur_label_dur[0], cur_label_dur[1]]
+                    )
+                    if cross_dur > max_dur and cross_dur > 1e-3:
+                        max_dur = cross_dur
+                        max_label = given_reg[2]
+                reg_label[i] = max_label
+        else:
+            reg_label = None
 
         with h5py.File(args.xvec_transform, 'r') as f:
             mean1 = np.array(f['mean1'])
@@ -139,18 +179,58 @@ if __name__ == '__main__':
                     fea, sm, np.diag(siE), np.diag(sV),
                     pi=None, gamma=qinit, maxSpeakers=qinit.shape[1],
                     maxIters=40, epsilon=1e-6, 
-                    loopProb=args.loopP, Fa=args.Fa, Fb=args.Fb)
+                    loopProb=args.loopP, Fa=args.Fa, Fb=args.Fb,
+                    label=reg_label, fusionFactor=args.fusion_factor, 
+                    plda_psi=plda_psi)
 
                 labels1st = np.argsort(-q, axis=1)[:, 0]
+                spk_to_clus_lab = dict()
+                final_spk_to_clus_lab = dict()
+                if reg_label is not None and args.replace_label:
+                    for i, spk_with_clus_lab in enumerate(zip(reg_label, labels1st)):
+                        if spk_with_clus_lab[0] == ' ':
+                            continue
+                        if spk_with_clus_lab[0] not in spk_to_clus_lab:
+                            spk_to_clus_lab[spk_with_clus_lab[0]] = {spk_with_clus_lab[1]: 1}
+                        else:
+                            if spk_with_clus_lab[1] not in spk_to_clus_lab[spk_with_clus_lab[0]]:
+                                spk_to_clus_lab[spk_with_clus_lab[0]][spk_with_clus_lab[1]] = 1
+                            else:
+                                spk_to_clus_lab[spk_with_clus_lab[0]][spk_with_clus_lab[1]] += 1
+                    for key, value in spk_to_clus_lab.items():
+                        max_spk = None
+                        max_spk_num = -1
+                        for k, v in spk_to_clus_lab[key].items():
+                            if max_spk is None:
+                                max_spk = k
+                                max_spk_num = v
+                            else:
+                                if v > max_spk_num:
+                                    max_spk = k
+                                    max_spk_num = v
+                        if max_spk not in final_spk_to_clus_lab:
+                            final_spk_to_clus_lab[max_spk] = key
+                        else:
+                            raise Exception("Naming conflict during alignment of speakers to clustering labels")
+                    labels1st_str = [''] * len(labels1st)
+                    for i, l in enumerate(labels1st):
+                        if labels1st[i] in final_spk_to_clus_lab:
+                            labels1st_str[i] = final_spk_to_clus_lab[labels1st[i]]
+                        else:
+                            labels1st_str[i] = str(labels1st[i])
+                    labels1st_str = np.array(labels1st_str)
+                else:
+                    labels1st_str = labels1st
+                    
                 if q.shape[1] > 1:
                     labels2nd = np.argsort(-q, axis=1)[:, 1]
         else:
             raise ValueError('Wrong option for args.initialization.')
 
-        assert(np.all(segs_dict[file_name][0] == np.array(seg_names)))
-        start, end = segs_dict[file_name][1].T
+        assert(np.all(segs_dict_old[file_name][0] == np.array(seg_names)))
+        start, end = segs_dict_old[file_name][1].T
 
-        starts, ends, out_labels = merge_adjacent_labels(start, end, labels1st)
+        starts, ends, out_labels = merge_adjacent_labels(start, end, labels1st_str)
         mkdir_p(args.out_rttm_dir)
         with open(os.path.join(args.out_rttm_dir, f'{file_name}.rttm'), 'w') as fp:
             write_output(fp, out_labels, starts, ends)

@@ -22,7 +22,7 @@ if [[ $INSTRUCTION = "xvectors" ]]; then
 
 	WEIGHTS=$DIR/VBx/models/ResNet101_16kHz/nnet/raw_81.pth
 	EXTRACT_SCRIPT=$DIR/VBx/extract.sh
-	DEVICE=cpu
+	DEVICE=gpu
 
 	mkdir -p $xvec_dir
 	$EXTRACT_SCRIPT ResNet101 $WEIGHTS $WAV_DIR $LAB_DIR $FILE_LIST $xvec_dir $DEVICE
@@ -50,8 +50,10 @@ if [[ $INSTRUCTION = "diarization" ]]; then
 		mkdir -p $OUT_DIR
 		while IFS= read -r line; do
 			grep $line $FILE_LIST > $exp_dir/lists/$line".txt"
-			python3="unset PYTHONPATH ; unset PYTHONHOME ; export PATH=\"/mnt/matylda5/iplchot/python_public/anaconda3/bin:$PATH\""
-			echo "$python3 ; python $DIR/VBx/vbhmm.py --init $METHOD --out-rttm-dir $OUT_DIR/rttms --xvec-ark-file $xvec_dir/xvectors/$line.ark --segments-file $xvec_dir/segments/$line --plda-file $BACKEND_DIR/plda --xvec-transform $BACKEND_DIR/transform.h5 --threshold $thr --init-smoothing $smooth --lda-dim $lda_dim --Fa $Fa --Fb $Fb --loopP $loopP" >> $TASKFILE
+		echo "test from amirun"
+		# python3="unset PYTHONPATH ; unset PYTHONHOME ; export PATH=\"/mnt/matylda5/iplchot/python_public/anaconda3/bin:$PATH\""
+		# echo "$python3 ; python $DIR/VBx/vbhmm.py --init $METHOD --out-rttm-dir $OUT_DIR/rttms --xvec-ark-file $xvec_dir/xvectors/$line.ark --segments-file $xvec_dir/segments/$line --plda-file $BACKEND_DIR/plda --xvec-transform $BACKEND_DIR/transform.h5 --threshold $thr --target-energy $tareng --init-smoothing $smooth --lda-dim $lda_dim --Fa $Fa --Fb $Fb --loopP $loopP" >> $TASKFILE
+		python $DIR/VBx/vbhmm.py --init $METHOD --out-rttm-dir $OUT_DIR/rttms --xvec-ark-file $xvec_dir/xvectors/$line.ark --segments-file $xvec_dir/segments/$line --plda-file $BACKEND_DIR/plda --xvec-transform $BACKEND_DIR/transform.h5 --threshold $thr --target-energy $tareng --init-smoothing $smooth --lda-dim $lda_dim --Fa $Fa --Fb $Fb --loopP $loopP
 		done < $FILE_LIST
 		bash $TASKFILE > $OUTFILE
 

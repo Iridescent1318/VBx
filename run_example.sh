@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+export KALDI_ROOT='/home/liaozty20/kaldi'
 CDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 mkdir -p exp
@@ -15,8 +16,10 @@ do
           --in-wav-dir example/audios/16k \
           --out-ark-fn exp/${filename}.ark \
           --out-seg-fn exp/${filename}.seg \
-          --weights VBx/models/ResNet101_16kHz/nnet/final.onnx \
-          --backend onnx
+          --weights VBx/models/ResNet101_16kHz/nnet/raw_81.pth \
+          --backend pytorch \
+          --model ResNet101 \
+          --gpus 2
 
       # run variational bayes on top of x-vectors
       python VBx/vbhmm.py --init AHC+VB \

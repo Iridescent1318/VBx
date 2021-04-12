@@ -1,0 +1,1 @@
+nohup ./run_formal.sh callhome97 0.0 > run_formal.log 2>&1 &
