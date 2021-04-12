@@ -154,14 +154,14 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
     Ns = gamma.sum(0)                                     # bracket in eq. (34) for all 's'
     VtiEFs = gamma.T.dot(VtiEF)                           # eq. (35) except for \Lambda_s^{-1} for all 's'
     for sid in range(maxSpeakers):
-        invL = np.linalg.inv(np.eye(R) + Ns[sid]*VtiEV*Fa/Fb) # eq. (34) inverse
-        a = invL.dot(VtiEFs[sid])*Fa/Fb                                        # eq. (35)
-        # eq. (29) except for the prior term \ln \pi_s. Our prior is given by HMM
-        # trasition probability matrix. Instead of eq. (30), we need to use
-        # forward-backwar algorithm to calculate per-frame speaker posteriors,
-        # where 'lls' plays role of HMM output log-probabilities
-        lls[:,sid] = Fa * (G + VtiEF.dot(a) - 0.5 * ((invL+np.outer(a,a)) * VtiEV).sum())
-        L += Fb* 0.5 * (logdet(invL) - np.sum(np.diag(invL) + a**2, 0) + R)
+      invL = np.linalg.inv(np.eye(R) + Ns[sid]*VtiEV*Fa/Fb) # eq. (34) inverse
+      a = invL.dot(VtiEFs[sid])*Fa/Fb                                        # eq. (35)
+      # eq. (29) except for the prior term \ln \pi_s. Our prior is given by HMM
+      # trasition probability matrix. Instead of eq. (30), we need to use
+      # forward-backwar algorithm to calculate per-frame speaker posteriors,
+      # where 'lls' plays role of HMM output log-probabilities
+      lls[:,sid] = Fa * (G + VtiEF.dot(a) - 0.5 * ((invL+np.outer(a,a)) * VtiEV).sum())
+      L += Fb* 0.5 * (logdet(invL) - np.sum(np.diag(invL) + a**2, 0) + R)
 
     # Construct transition probability matrix with linear chain of 'minDur'
     # states for each of 'maxSpeaker' speaker. The last state in each chain has
@@ -213,18 +213,18 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
 
 
 def precalculate_VtiEV(V, iE):
-    tril_ind = np.tril_indices(V.shape[0])
-    VtiEV[:] = V.dot(iE).dot(V.T)[tril_ind]
-    return VtiEV
+  tril_ind = np.tril_indices(V.shape[0])
+  VtiEV[:] = V.dot(iE).dot(V.T)[tril_ind]
+  return VtiEV
 
 
 # Initialize gamma (per-frame speaker posteriors) from a reference
 # (vector of per-frame zero based integer speaker IDs)
 def frame_labels2posterior_mx(labels):
-    #initialize from reference
-    pmx = np.zeros((len(labels), labels.max()+1))
-    pmx[np.arange(len(labels)), labels] = 1
-    return pmx
+  #initialize from reference
+  pmx = np.zeros((len(labels), labels.max()+1))
+  pmx[np.arange(len(labels)), labels] = 1
+  return pmx
 
 
 # Calculates Diarization Error Rate (DER) or per-frame cross-entropy between
@@ -233,112 +233,112 @@ def frame_labels2posterior_mx(labels):
 # calculating DER. If expected=TRUE, posteriors in gamma are used to calculated
 # "expected" DER.
 def DER(gamma, ref, expected=True, xentropy=False):
-    from itertools import permutations
+  from itertools import permutations
 
-    if not expected:
-        # replce probabiities in gamma by zeros and ones
-        hard_labels = gamma.argmax(1)
-        gamma = np.zeros_like(gamma)
-        gamma[range(len(gamma)), hard_labels] = 1
+  if not expected:
+    # replce probabiities in gamma by zeros and ones
+    hard_labels = gamma.argmax(1)
+    gamma = np.zeros_like(gamma)
+    gamma[range(len(gamma)), hard_labels] = 1
 
-    err_mx = np.empty((ref.max()+1, gamma.shape[1]))
-    for s in range(err_mx.shape[0]):
-        tmpq = gamma[ref == s,:]
-        err_mx[s] = (-np.log(tmpq) if xentropy else tmpq).sum(0)
+  err_mx = np.empty((ref.max()+1, gamma.shape[1]))
+  for s in range(err_mx.shape[0]):
+    tmpq = gamma[ref == s,:]
+    err_mx[s] = (-np.log(tmpq) if xentropy else tmpq).sum(0)
 
-    if err_mx.shape[0] < err_mx.shape[1]:
-        err_mx = err_mx.T
+  if err_mx.shape[0] < err_mx.shape[1]:
+    err_mx = err_mx.T
 
-    # try all alignments (permutations) of reference and detected speaker
-    #could be written in more efficient way using dynamic programing
-    acc = [err_mx[perm[:err_mx.shape[1]], range(err_mx.shape[1])].sum()
-              for perm in permutations(range(err_mx.shape[0]))]
-    if xentropy:
-       return min(acc)/float(len(ref))
-    else:
-       return (len(ref) - max(acc))/float(len(ref))
+  # try all alignments (permutations) of reference and detected speaker
+  #could be written in more efficient way using dynamic programing
+  acc = [err_mx[perm[:err_mx.shape[1]], range(err_mx.shape[1])].sum()
+        for perm in permutations(range(err_mx.shape[0]))]
+  if xentropy:
+    return min(acc)/float(len(ref))
+  else:
+    return (len(ref) - max(acc))/float(len(ref))
 
 
 ###############################################################################
 # Module private functions
 ###############################################################################
 def logsumexp(x, axis=0):
-    xmax = x.max(axis)
-    with np.errstate(invalid="ignore"): # nans do not affect inf
-      x = xmax + np.log(np.sum(np.exp(x - np.expand_dims(xmax, axis)), axis))
-    infs = np.isinf(xmax)
-    if np.ndim(x) > 0:
-      x[infs] = xmax[infs]
-    elif infs:
-      x = xmax
-    return x
+  xmax = x.max(axis)
+  with np.errstate(invalid="ignore"): # nans do not affect inf
+    x = xmax + np.log(np.sum(np.exp(x - np.expand_dims(xmax, axis)), axis))
+  infs = np.isinf(xmax)
+  if np.ndim(x) > 0:
+    x[infs] = xmax[infs]
+  elif infs:
+    x = xmax
+  return x
 
 
 # The folowing two functions are only versions optimized for speed using numexpr
 # module and can be replaced by logsumexp and np.exp functions to avoid
 # the dependency on the module.
 def logsumexp_ne(x, axis=0):
-    xmax = np.array(x).max(axis=axis)
-    xmax_e = np.expand_dims(xmax, axis)
-    x = ne.evaluate("sum(exp(x - xmax_e), axis=%d)" % axis)
-    x = ne.evaluate("xmax + log(x)")
-    infs = np.isinf(xmax)
-    if np.ndim(x) > 0:
-      x[infs] = xmax[infs]
-    elif infs:
-      x = xmax
-    return x
+  xmax = np.array(x).max(axis=axis)
+  xmax_e = np.expand_dims(xmax, axis)
+  x = ne.evaluate("sum(exp(x - xmax_e), axis=%d)" % axis)
+  x = ne.evaluate("xmax + log(x)")
+  infs = np.isinf(xmax)
+  if np.ndim(x) > 0:
+    x[infs] = xmax[infs]
+  elif infs:
+    x = xmax
+  return x
 
 
 def exp_ne(x, out=None):
-    return ne.evaluate("exp(x)", out=None)
+  return ne.evaluate("exp(x)", out=None)
 
 
 # Convert vector with lower-triangular coefficients into symetric matrix
 def tril_to_sym(tril):
-    R = np.sqrt(len(tril)*2).astype(int)
-    tril_ind = np.tril_indices(R)
-    S = np.empty((R,R))
-    S[tril_ind]       = tril
-    S[tril_ind[::-1]] = tril
-    return S
+  R = np.sqrt(len(tril)*2).astype(int)
+  tril_ind = np.tril_indices(R)
+  S = np.empty((R,R))
+  S[tril_ind]       = tril
+  S[tril_ind[::-1]] = tril
+  return S
 
 
 def logdet(A):
-    return 2*np.sum(np.log(np.diag(spl.cholesky(A))))
+  return 2*np.sum(np.log(np.diag(spl.cholesky(A))))
 
 
 def forward_backward(lls, tr, ip):
-    """
-    Inputs:
-        lls - matrix of per-frame log HMM state output probabilities
-        tr  - transition probability matrix
-        ip  - vector of initial state probabilities (i.e. statrting in the state)
-    Outputs:
-        pi  - matrix of per-frame state occupation posteriors
-        tll - total (forward) log-likelihood
-        lfw - log forward probabilities
-        lfw - log backward probabilities
-    """
-    with np.errstate(divide="ignore"): # too close to 0 values do not change the result
-      ltr = np.log(tr)
-    lfw = np.empty_like(lls)
-    lbw = np.empty_like(lls)
-    lfw[:] = -np.inf
-    lbw[:] = -np.inf
-    with np.errstate(divide="ignore"): # too close to 0 values do not change the result
-      lfw[0] = lls[0] + np.log(ip)
-    lbw[-1] = 0.0
+  """
+  Inputs:
+    lls - matrix of per-frame log HMM state output probabilities
+    tr  - transition probability matrix
+    ip  - vector of initial state probabilities (i.e. statrting in the state)
+  Outputs:
+    pi  - matrix of per-frame state occupation posteriors
+    tll - total (forward) log-likelihood
+    lfw - log forward probabilities
+    lfw - log backward probabilities
+  """
+  with np.errstate(divide="ignore"): # too close to 0 values do not change the result
+    ltr = np.log(tr)
+  lfw = np.empty_like(lls)
+  lbw = np.empty_like(lls)
+  lfw[:] = -np.inf
+  lbw[:] = -np.inf
+  with np.errstate(divide="ignore"): # too close to 0 values do not change the result
+    lfw[0] = lls[0] + np.log(ip)
+  lbw[-1] = 0.0
 
-    for ii in range(1,len(lls)):
-        lfw[ii] =  lls[ii] + logsumexp(lfw[ii-1] + ltr.T, axis=1)
+  for ii in range(1,len(lls)):
+    lfw[ii] =  lls[ii] + logsumexp(lfw[ii-1] + ltr.T, axis=1)
 
-    for ii in reversed(range(len(lls)-1)):
-        lbw[ii] = logsumexp(ltr + lls[ii+1] + lbw[ii+1], axis=1)
+  for ii in reversed(range(len(lls)-1)):
+    lbw[ii] = logsumexp(ltr + lls[ii+1] + lbw[ii+1], axis=1)
 
-    tll = logsumexp(lfw[-1])
-    pi = np.exp(lfw + lbw - tll)
-    return pi, tll, lfw, lbw
+  tll = logsumexp(lfw[-1])
+  pi = np.exp(lfw + lbw - tll)
+  return pi, tll, lfw, lbw
 
 
 def normal_pdf_log(x, mean, diag_cov):
