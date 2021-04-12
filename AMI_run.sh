@@ -40,7 +40,6 @@ if [[ $INSTRUCTION = "diarization" ]]; then
 	mkdir -p $exp_dir/lists
 
 	thr=-0.015
-	tareng=0.3
 	smooth=7.0
 	lda_dim=128
 	Fa=0.4
