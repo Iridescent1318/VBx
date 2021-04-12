@@ -5,7 +5,7 @@ CDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 DIR=/home/liaozty20/VBx/spkrd_test_audio/ref
 VB_DIR=/home/liaozty20/VBx/VBx
 
-mkdir -p sys/xvector sys/seg sys/rttm sys/fbank
+mkdir -p sys/xvector sys/seg sys/rttm
 
 for audio in $(ls ${DIR}/wav)
 do

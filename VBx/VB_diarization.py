@@ -163,51 +163,51 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
             lls[:,sid] = Fa * (G + VtiEF.dot(a) - 0.5 * ((invL+np.outer(a,a)) * VtiEV).sum())
             L += Fb* 0.5 * (logdet(invL) - np.sum(np.diag(invL) + a**2, 0) + R)
 
-    # Construct transition probability matrix with linear chain of 'minDur'
-    # states for each of 'maxSpeaker' speaker. The last state in each chain has
-    # self-loop probability 'loopProb' and the transition probabilities to the
-    # initial chain states given by vector '(1-loopProb) * pi'. From all other,
-    #states, one must move to the next state in the chain with probability one.
-    tr[minDur-1::minDur,0::minDur]=(1-loopProb)*pi
-    tr[(np.arange(1,maxSpeakers+1)*minDur-1,)*2] += loopProb
-    ip[::minDur]=pi
-    # per-frame HMM state posteriors. Note that we can have linear chain of minDur states
-    # for each speaker.
-    gamma, tll, lf, lb = forward_backward(lls.repeat(minDur,axis=1), tr, ip) #, np.arange(1,maxSpeakers+1)*minDur-1)
+        # Construct transition probability matrix with linear chain of 'minDur'
+        # states for each of 'maxSpeaker' speaker. The last state in each chain has
+        # self-loop probability 'loopProb' and the transition probabilities to the
+        # initial chain states given by vector '(1-loopProb) * pi'. From all other,
+        #states, one must move to the next state in the chain with probability one.
+        tr[minDur-1::minDur,0::minDur]=(1-loopProb)*pi
+        tr[(np.arange(1,maxSpeakers+1)*minDur-1,)*2] += loopProb
+        ip[::minDur]=pi
+        # per-frame HMM state posteriors. Note that we can have linear chain of minDur states
+        # for each speaker.
+        gamma, tll, lf, lb = forward_backward(lls.repeat(minDur,axis=1), tr, ip) #, np.arange(1,maxSpeakers+1)*minDur-1)
 
-    # Right after updating q(Z), tll is E{log p(X|,Y,Z)} - KL{q(Z)||p(Z)}.
-    # L now contains -KL{q(Y)||p(Y)}. Therefore, L+ttl is correct value for ELBO.
-    L += tll
-    Li.append([L])
+        # Right after updating q(Z), tll is E{log p(X|,Y,Z)} - KL{q(Z)||p(Z)}.
+        # L now contains -KL{q(Y)||p(Y)}. Therefore, L+ttl is correct value for ELBO.
+        L += tll
+        Li.append([L])
 
-    # ML estimate of speaker prior probabilities (analogue to eq. (38))
-    with np.errstate(divide="ignore"): # too close to 0 values do not change the result
-        pi = gamma[0,::minDur] + np.exp(logsumexp(lf[:-1,minDur-1::minDur],axis=1)[:,np.newaxis]
-                  + lb[1:,::minDur] + lls[1:] + np.log((1-loopProb)*pi)-tll).sum(0)
-    pi = pi / pi.sum()
+        # ML estimate of speaker prior probabilities (analogue to eq. (38))
+        with np.errstate(divide="ignore"): # too close to 0 values do not change the result
+            pi = gamma[0,::minDur] + np.exp(logsumexp(lf[:-1,minDur-1::minDur],axis=1)[:,np.newaxis]
+                    + lb[1:,::minDur] + lls[1:] + np.log((1-loopProb)*pi)-tll).sum(0)
+        pi = pi / pi.sum()
 
-    # per-frame speaker posteriors (analogue to eq. (30)), obtained by summing
-    # HMM state posteriors corresponding to each speaker
-    gamma = gamma.reshape(len(gamma),maxSpeakers,minDur).sum(axis=2)
-
-
-    # if reference is provided, report DER, cross-entropy and plot the figures
-    if ref is not None:
-        Li[-1] += [DER(gamma, ref), DER(gamma, ref, xentropy=True)]
-
-        if plot:
-            import matplotlib.pyplot
-            if ii == 0: matplotlib.pyplot.clf()
-            matplotlib.pyplot.subplot(maxIters, 1, ii+1)
-            matplotlib.pyplot.plot(gamma, lw=2)
-            matplotlib.pyplot.imshow(np.atleast_2d(ref), interpolation='none', aspect='auto',
-                                    cmap=matplotlib.pyplot.cm.Pastel1, extent=(0, len(ref), -0.05, 1.05))
-        print(ii, Li[-2])
+        # per-frame speaker posteriors (analogue to eq. (30)), obtained by summing
+        # HMM state posteriors corresponding to each speaker
+        gamma = gamma.reshape(len(gamma),maxSpeakers,minDur).sum(axis=2)
 
 
-    if ii > 0 and L - Li[-2][0] < epsilon:
-        if L - Li[-1][0] < 0: print('WARNING: Value of auxiliary function has decreased!')
-        break
+        # if reference is provided, report DER, cross-entropy and plot the figures
+        if ref is not None:
+            Li[-1] += [DER(gamma, ref), DER(gamma, ref, xentropy=True)]
+
+            if plot:
+                import matplotlib.pyplot
+                if ii == 0: matplotlib.pyplot.clf()
+                matplotlib.pyplot.subplot(maxIters, 1, ii+1)
+                matplotlib.pyplot.plot(gamma, lw=2)
+                matplotlib.pyplot.imshow(np.atleast_2d(ref), interpolation='none', aspect='auto',
+                                        cmap=matplotlib.pyplot.cm.Pastel1, extent=(0, len(ref), -0.05, 1.05))
+            print(ii, Li[-2])
+
+
+        if ii > 0 and L - Li[-2][0] < epsilon:
+            if L - Li[-1][0] < 0: print('WARNING: Value of auxiliary function has decreased!')
+            break
 
     return gamma, pi, Li
 
