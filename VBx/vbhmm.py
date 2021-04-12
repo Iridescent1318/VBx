@@ -181,7 +181,7 @@ if __name__ == '__main__':
                     maxIters=40, epsilon=1e-6, 
                     loopProb=args.loopP, Fa=args.Fa, Fb=args.Fb,
                     label=reg_label, fusionFactor=args.fusion_factor, 
-                    plda_psi=plda_psi)
+                    pldaPsi=plda_psi)
 
                 labels1st = np.argsort(-q, axis=1)[:, 0]
                 spk_to_clus_lab = dict()
