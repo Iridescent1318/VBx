@@ -81,12 +81,12 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
         and reference if 'ref' is provided) over iterations.
     """
 
-    D=X.shape[1]  # feature dimensionality
-    R=V.shape[0]  # subspace rank
-    nframes=X.shape[0]
+    D = X.shape[1]  # feature dimensionality
+    R = V.shape[0]  # subspace rank
+    nframes = X.shape[0]
 
     if pi is None:
-        pi = np.ones(maxSpeakers)/maxSpeakers
+        pi = np.ones(maxSpeakers) / maxSpeakers
     else:
         maxSpeakers = len(pi)
 
@@ -130,50 +130,52 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
                     plda_sim = dict()
                     for key, val in reg_frames_mean.items():
                         plda_sim[key] = normal_pdf_log(frame, reg_frames_plda_mean[key], reg_frames_plda_cov[key])
-                    fusion_label = max(plda_sim.items(), key=lambda e: e[1])[0]
-                    max_plda = max(plda_sim.items(), key=lambda e: e[1])[1]
+                    fusion_label, max_plda = max(plda_sim.items(), key=lambda e: e[1])[0], \
+                                             max(plda_sim.items(), key=lambda e: e[1])[1]
                     if max_plda >= -600:
                         X[i, :] = fusionFactor * reg_frames_mean[fusion_label] + (1 - fusionFactor) * X[i, :]
 
     # calculate UBM mixture frame posteriors (i.e. per-frame zero order statistics)
     #ll = np.sum(X.dot(-0.5*iE)*X, axis=1) + m.dot(iE).dot(X.T)-0.5*(m.dot(iE).dot(m) - logdet(iE) + D*np.log(2*np.pi))
-    G = -0.5*(np.sum((X-m).dot(iE)*(X-m), axis=1) - logdet(iE) + D*np.log(2*np.pi))
+    G = -0.5 * (np.sum((X - m).dot(iE) * (X - m), axis=1) - logdet(iE) + D * np.log(2 * np.pi))
     LL = np.sum(G) # total log-likelihod as calculated using UBM
     VtiEV = V.dot(iE).dot(V.T)
-    VtiEF = (X-m).dot(iE.dot(V).T)
+    print(X.shape)
+    VtiEF = (X - m).dot(iE.dot(V).T)
+    print(VtiEF.shape)
 
-    Li = [[LL*Fa]] # for the 0-th iteration,
+    Li = [[LL * Fa]] # for the 0-th iteration,
     if ref is not None:
         Li[-1] += [DER(gamma, ref), DER(gamma, ref, xentropy=True)]
 
     lls = np.zeros_like(gamma)
-    tr = np.eye(minDur*maxSpeakers, k=1)
-    ip = np.zeros(minDur*maxSpeakers)
+    tr = np.eye(minDur * maxSpeakers, k=1)
+    ip = np.zeros(minDur * maxSpeakers)
     for ii in range(maxIters):
         L = 0 # objective function (37) (i.e. VB lower-bound on the evidence)
         Ns = gamma.sum(0)                                     # bracket in eq. (34) for all 's'
         VtiEFs = gamma.T.dot(VtiEF)                           # eq. (35) except for \Lambda_s^{-1} for all 's'
         for sid in range(maxSpeakers):
-            invL = np.linalg.inv(np.eye(R) + Ns[sid]*VtiEV*Fa/Fb) # eq. (34) inverse
-            a = invL.dot(VtiEFs[sid])*Fa/Fb                                        # eq. (35)
+            invL = np.linalg.inv(np.eye(R) + Ns[sid] * VtiEV * Fa / Fb) # eq. (34) inverse
+            a = invL.dot(VtiEFs[sid]) * Fa / Fb                                        # eq. (35)
             # eq. (29) except for the prior term \ln \pi_s. Our prior is given by HMM
             # trasition probability matrix. Instead of eq. (30), we need to use
             # forward-backwar algorithm to calculate per-frame speaker posteriors,
             # where 'lls' plays role of HMM output log-probabilities
-            lls[:,sid] = Fa * (G + VtiEF.dot(a) - 0.5 * ((invL+np.outer(a,a)) * VtiEV).sum())
-            L += Fb* 0.5 * (logdet(invL) - np.sum(np.diag(invL) + a**2, 0) + R)
+            lls[:, sid] = Fa * (G + VtiEF.dot(a) - 0.5 * ((invL + np.outer(a,a)) * VtiEV).sum())
+            L += Fb* 0.5 * (logdet(invL) - np.sum(np.diag(invL) + a ** 2, 0) + R)
 
         # Construct transition probability matrix with linear chain of 'minDur'
         # states for each of 'maxSpeaker' speaker. The last state in each chain has
         # self-loop probability 'loopProb' and the transition probabilities to the
         # initial chain states given by vector '(1-loopProb) * pi'. From all other,
         #states, one must move to the next state in the chain with probability one.
-        tr[minDur-1::minDur,0::minDur]=(1-loopProb)*pi
-        tr[(np.arange(1,maxSpeakers+1)*minDur-1,)*2] += loopProb
-        ip[::minDur]=pi
+        tr[minDur - 1::minDur, 0::minDur] = (1 - loopProb) * pi
+        tr[(np.arange(1, maxSpeakers + 1) * minDur - 1,) * 2] += loopProb
+        ip[::minDur] = pi
         # per-frame HMM state posteriors. Note that we can have linear chain of minDur states
         # for each speaker.
-        gamma, tll, lf, lb = forward_backward(lls.repeat(minDur,axis=1), tr, ip) #, np.arange(1,maxSpeakers+1)*minDur-1)
+        gamma, tll, lf, lb = forward_backward(lls.repeat(minDur, axis=1), tr, ip) #, np.arange(1,maxSpeakers+1)*minDur-1)
 
         # Right after updating q(Z), tll is E{log p(X|,Y,Z)} - KL{q(Z)||p(Z)}.
         # L now contains -KL{q(Y)||p(Y)}. Therefore, L+ttl is correct value for ELBO.
@@ -182,13 +184,13 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
 
         # ML estimate of speaker prior probabilities (analogue to eq. (38))
         with np.errstate(divide="ignore"): # too close to 0 values do not change the result
-            pi = gamma[0,::minDur] + np.exp(logsumexp(lf[:-1,minDur-1::minDur],axis=1)[:,np.newaxis]
-                    + lb[1:,::minDur] + lls[1:] + np.log((1-loopProb)*pi)-tll).sum(0)
+            pi = gamma[0,::minDur] + np.exp(logsumexp(lf[:-1,minDur - 1::minDur], axis=1)[:,np.newaxis]
+                    + lb[1:,::minDur] + lls[1:] + np.log((1 - loopProb) * pi) - tll).sum(0)
         pi = pi / pi.sum()
 
         # per-frame speaker posteriors (analogue to eq. (30)), obtained by summing
         # HMM state posteriors corresponding to each speaker
-        gamma = gamma.reshape(len(gamma),maxSpeakers,minDur).sum(axis=2)
+        gamma = gamma.reshape(len(gamma), maxSpeakers, minDur).sum(axis=2)
 
 
         # if reference is provided, report DER, cross-entropy and plot the figures
