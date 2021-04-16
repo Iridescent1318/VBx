@@ -116,6 +116,15 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
                 reg_frames_plda_mean[key] = n * pldaPsi / (n * pldaPsi + np.ones(D)) * reg_frames_mean[key]
                 reg_frames_plda_cov[key] = np.ones(D) + pldaPsi / (n * pldaPsi + np.ones(D))
         
+
+    # calculate UBM mixture frame posteriors (i.e. per-frame zero order statistics)
+    #ll = np.sum(X.dot(-0.5*iE)*X, axis=1) + m.dot(iE).dot(X.T)-0.5*(m.dot(iE).dot(m) - logdet(iE) + D*np.log(2*np.pi))
+    G = -0.5 * (np.sum((X - m).dot(iE) * (X - m), axis=1) - logdet(iE) + D * np.log(2 * np.pi))
+    LL = np.sum(G) # total log-likelihod as calculated using UBM
+    VtiEV = V.dot(iE).dot(V.T)
+    print(X.shape)
+    VtiEF = (X - m).dot(iE.dot(V).T)
+    if label is not None:
         for i, frame in enumerate(X):
             if label[i] == ' ':
                 if pldaPsi is None:
@@ -125,7 +134,7 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
                     fusion_label = max(cos_sim.items(), key=lambda e: e[1])[0]
                     max_cos_dist = max(cos_sim.items(), key=lambda e: e[1])[1]
                     if max_cos_dist >= 0.6:
-                        X[i, :] = fusionFactor * reg_frames_mean[fusion_label] + (1 - fusionFactor) * X[i, :]
+                        VtiEF[i, :] = fusionFactor * reg_frames_mean[fusion_label] + (1 - fusionFactor) * VtiEF[i, :]
                 else:
                     plda_sim = dict()
                     for key, val in reg_frames_mean.items():
@@ -133,15 +142,7 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
                     fusion_label, max_plda = max(plda_sim.items(), key=lambda e: e[1])[0], \
                                              max(plda_sim.items(), key=lambda e: e[1])[1]
                     if max_plda >= -600:
-                        X[i, :] = fusionFactor * reg_frames_mean[fusion_label] + (1 - fusionFactor) * X[i, :]
-
-    # calculate UBM mixture frame posteriors (i.e. per-frame zero order statistics)
-    #ll = np.sum(X.dot(-0.5*iE)*X, axis=1) + m.dot(iE).dot(X.T)-0.5*(m.dot(iE).dot(m) - logdet(iE) + D*np.log(2*np.pi))
-    G = -0.5 * (np.sum((X - m).dot(iE) * (X - m), axis=1) - logdet(iE) + D * np.log(2 * np.pi))
-    LL = np.sum(G) # total log-likelihod as calculated using UBM
-    VtiEV = V.dot(iE).dot(V.T)
-    print(X.shape)
-    VtiEF = (X - m).dot(iE.dot(V).T)
+                        VtiEF[i, :] = fusionFactor * reg_frames_mean[fusion_label] + (1 - fusionFactor) * VtiEF[i, :]
     print(VtiEF.shape)
 
     Li = [[LL * Fa]] # for the 0-th iteration,
