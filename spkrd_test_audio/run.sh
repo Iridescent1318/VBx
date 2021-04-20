@@ -41,7 +41,8 @@ do
         --Fb 17 \
         --loopP 0.40 \
         --fusion-factor 0.05 \
-        --reg-seg-file sys/regseg/${filename}.regseg
+        --reg-seg-file sys/regseg/${filename}.regseg \
+        --fusion-variable second_stat_iter
     echo "VB-HMM Ends: "${filename}""
 
     echo "Scoring Starts: "${filename}""

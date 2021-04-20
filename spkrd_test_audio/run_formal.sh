@@ -2,6 +2,7 @@
 
 dataset=$1
 ffactor=$2
+fvariable=$3
 
 export KALDI_ROOT='/home/liaozty20/kaldi'
 CDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
@@ -35,7 +36,7 @@ else
     exit 1
 fi
 
-echo "Running on ${dataset}, with factor ${ffactor}"
+echo "Running on ${dataset}, with factor ${ffactor} and variable ${fvariable}"
 echo "data_dir: ${DATA_DIR}"
 echo "weights_dir: ${WEIGHTS_DIR}"
 echo "xvec_trans_dir: ${XVEC_TRANS_DIR}"
@@ -45,18 +46,18 @@ echo "vbhmm_Fa: ${VBHMM_FA}"
 echo "vbhmm_Fb: ${VBHMM_FB}"
 echo "vbhmm_loop: ${VBHMM_LOOP}"
 
-mkdir -p ${dataset}_sys/xvector ${dataset}_sys/seg ${dataset}_sys/rttm_ffactor_${ffactor} ${dataset}_sys/regseg
+mkdir -p ${dataset}_sys/xvector ${dataset}_sys/seg ${dataset}_sys/rttm_ffactor_${ffactor}_${fvariable} ${dataset}_sys/regseg
 
 python3 select_reg_segs.py -i ${DATA_DIR}/rttm -o ${dataset}_sys/regseg -a regseg -e ${REGSEG_END} && echo "Selection of registered segments finished. Length: about ${REGSEG_END} seconds."
 
 for audio in $(ls ${DATA_DIR}/wav)
 do
     filename=$(echo "${audio}" | cut -f 1 -d '.')
-    echo ${filename} > ${dataset}_sys_${ffactor}_list.txt
+    echo ${filename} > ${dataset}_sys_${ffactor}_${fvariable}_list.txt
     if !([ -f ${dataset}_sys/xvector/${filename}.ark ]); then
         echo "X-vectors Extraction Starts: ${filename}"
         # run feature and x-vectors extraction
-        python ${VB_DIR}/predict.py --in-file-list ${dataset}_sys_${ffactor}_list.txt \
+        python ${VB_DIR}/predict.py --in-file-list ${dataset}_sys_${ffactor}_${fvariable}_list.txt \
             --in-lab-dir ${DATA_DIR}/labs \
             --in-wav-dir ${DATA_DIR}/wav \
             --out-ark-fn ${dataset}_sys/xvector/${filename}.ark \
@@ -72,7 +73,7 @@ do
     # run variational bayes on top of x-vectors
     python ${VB_DIR}/vbhmm.py --file-name ${filename} \
         --init AHC+VB \
-        --out-rttm-dir ${dataset}_sys/rttm_ffactor_${ffactor} \
+        --out-rttm-dir ${dataset}_sys/rttm_ffactor_${ffactor}_${fvariable} \
         --xvec-ark-file ${dataset}_sys/xvector/${filename}.ark \
         --segments-file ${dataset}_sys/seg/${filename}.seg \
         --xvec-transform ${XVEC_TRANS_DIR} \
@@ -83,13 +84,14 @@ do
         --Fb ${VBHMM_FB} \
         --loopP ${VBHMM_LOOP} \
         --fusion-factor ${ffactor} \
-        --reg-seg-file ${dataset}_sys/regseg/${filename}.regseg
+        --reg-seg-file ${dataset}_sys/regseg/${filename}.regseg \
+        --fusion-variable ${fvariable}
     echo "VB-HMM Ends: ${filename}"
 
     echo "Scoring Starts: ${filename}"
     # check if there is ground truth .rttm file
     REFDIR=${DATA_DIR}/rttm/${filename}.rttm
-    SYSDIR=${dataset}_sys/rttm_ffactor_${ffactor}/${filename}.rttm
+    SYSDIR=${dataset}_sys/rttm_ffactor_${ffactor}_${fvariable}/${filename}.rttm
     if [ -f $REFDIR ]
     then
         # run dscore

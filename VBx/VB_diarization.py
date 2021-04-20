@@ -37,7 +37,7 @@ from diarization_lib import cos_similarity
 def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters = 10,
                    epsilon = 1e-4, loopProb = 0.99, alphaQInit = 1.0, ref=None,
                    plot=False, minDur=1, Fa=1.0, Fb=1.0, label=None,
-                   fusionFactor=0.0, pldaPsi=None):
+                   fusionFactor=0.0, pldaPsi=None, fusionVariable='xvector'):
     """
     This is a simplified version of speaker diarization described in:
 
@@ -47,29 +47,31 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
     Variable names and equation numbers refer to those used in the paper
 
     Inputs:
-    X             - T x D array, where columns are D dimensional feature vectors for T frames
-    m             - C x D array of GMM component means
-    iE            - C x D array of GMM component inverse covariance matrix diagonals
-    V             - R x C x D array of eigenvoices
-    pi            - speaker priors, if any used for initialization
-    gamma         - frame posteriors, if any used for initialization
-    maxSpeakers   - maximum number of speakers expected in the utterance
-    maxIters      - maximum number of algorithm iterations
-    epsilon       - stop iterating, if obj. fun. improvement is less than epsilon
-    loopProb      - probability of not switching speakers between frames
-    alphaQInit    - Dirichlet concentraion parameter for initializing gamma
-    ref           - T dim. integer vector with reference speaker ID (0:maxSpeakers)
+    X              - T x D array, where columns are D dimensional feature vectors for T frames
+    m              - C x D array of GMM component means
+    iE             - C x D array of GMM component inverse covariance matrix diagonals
+    V              - R x C x D array of eigenvoices
+    pi             - speaker priors, if any used for initialization
+    gamma          - frame posteriors, if any used for initialization
+    maxSpeakers    - maximum number of speakers expected in the utterance
+    maxIters       - maximum number of algorithm iterations
+    epsilon        - stop iterating, if obj. fun. improvement is less than epsilon
+    loopProb       - probability of not switching speakers between frames
+    alphaQInit     - Dirichlet concentraion parameter for initializing gamma
+    ref            - T dim. integer vector with reference speaker ID (0:maxSpeakers)
                     per frame
-    plot          - if set to True, plot per-frame speaker posteriors.
-    minDur        - minimum number of frames between speaker turns imposed by linear
-                    chains of HMM states corresponding to each speaker. All the states
-                    in a chain share the same output distribution
-    Fa            - scale sufficient statiscits collected using UBM
-    Fb            - speaker regularization coefficient Fb (controls final # of speaker)
-    label         - labels of registered audio frames. 
-    fusionFactor  - the hyperparameter which determines the proportion of registered mean
-    pldaPsi       - the pretrained diagnoal parameter of the PLDA model. It will be used 
-                    only when label is not none
+    plot           - if set to True, plot per-frame speaker posteriors.
+    minDur         - minimum number of frames between speaker turns imposed by linear
+                     chains of HMM states corresponding to each speaker. All the states
+                     in a chain share the same output distribution
+    Fa             - scale sufficient statiscits collected using UBM
+    Fb             - speaker regularization coefficient Fb (controls final # of speaker)
+    label          - labels of registered audio frames. 
+    fusionFactor   - the hyperparameter which determines the proportion of registered mean
+    pldaPsi        - the pretrained diagnoal parameter of the PLDA model. It will be used 
+                     only when label is not none
+    fusionVariable - the variable (xvector or second statistic) to make fusion. It will be 
+                     ignored if label is None. 
 
     Outputs:
     gamma  - S x T matrix of posteriors attribution each frame to one of S possible
@@ -84,6 +86,7 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
     D = X.shape[1]  # feature dimensionality
     R = V.shape[0]  # subspace rank
     nframes = X.shape[0]
+    print(fusionVariable)
 
     if pi is None:
         pi = np.ones(maxSpeakers) / maxSpeakers
@@ -94,6 +97,9 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
         # initialize gamma from flat Dirichlet prior with concentrsaion parameter alphaQInit
         gamma = np.random.gamma(alphaQInit, size=(nframes, maxSpeakers))
         gamma = gamma / gamma.sum(1, keepdims=True)
+
+    if fusionVariable not in ('xvector', 'second_stat', 'second_stat_iter'):
+        raise Exception('Wrong fusion variable: only xvector, second_stat and second_stat_iter are supported.')
 
     if label is not None:
         assert X.shape[0] == label.shape[0], 'Error: segment shape is not equal to labels'
@@ -116,6 +122,25 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
                 reg_frames_plda_mean[key] = n * pldaPsi / (n * pldaPsi + np.ones(D)) * reg_frames_mean[key]
                 reg_frames_plda_cov[key] = np.ones(D) + pldaPsi / (n * pldaPsi + np.ones(D))
         
+        if fusionVariable == 'xvector':
+            for i, frame in enumerate(X):
+                if label[i] == ' ':
+                    if pldaPsi is None:
+                        cos_sim = dict()
+                        for key, val in reg_frames_mean.items():
+                            cos_sim[key] = np.dot(frame, val) / (np.linalg.norm(frame) * np.linalg.norm(val))
+                        fusion_label = max(cos_sim.items(), key=lambda e: e[1])[0]
+                        max_cos_dist = max(cos_sim.items(), key=lambda e: e[1])[1]
+                        if max_cos_dist >= 0.6:
+                            VtiEF[i, :] = fusionFactor * reg_frames_mean[fusion_label] + (1 - fusionFactor) * VtiEF[i, :]
+                    else:
+                        plda_sim = dict()
+                        for key, val in reg_frames_mean.items():
+                            plda_sim[key] = normal_pdf_log(frame, reg_frames_plda_mean[key], reg_frames_plda_cov[key])
+                        fusion_label, max_plda = max(plda_sim.items(), key=lambda e: e[1])[0], \
+                                                max(plda_sim.items(), key=lambda e: e[1])[1]
+                        if max_plda >= -600:
+                            X[i, :] = fusionFactor * reg_frames_mean[fusion_label] + (1 - fusionFactor) * X[i, :]
 
     # calculate UBM mixture frame posteriors (i.e. per-frame zero order statistics)
     #ll = np.sum(X.dot(-0.5*iE)*X, axis=1) + m.dot(iE).dot(X.T)-0.5*(m.dot(iE).dot(m) - logdet(iE) + D*np.log(2*np.pi))
@@ -124,7 +149,21 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
     VtiEV = V.dot(iE).dot(V.T)
     print(X.shape)
     VtiEF = (X - m).dot(iE.dot(V).T)
-    if label is not None:
+
+    if label is not None and fusionVariable == 'second_stat':
+        assert VtiEF.shape[0] == label.shape[0], 'Error: second stat shape is not equal to labels'
+        reg_frame_second_stat = dict()
+        for i, frame in enumerate(VtiEF):
+            if not label[i] == ' ':
+                if label[i] not in reg_frame_second_stat:
+                    reg_frame_second_stat[label[i]] = [frame]
+                else:
+                    reg_frame_second_stat[label[i]].append(frame)
+        reg_frames_second_stat_mean = dict()
+        reg_frames_second_stat_num = dict()
+        for key, val in reg_frame_second_stat.items():
+            reg_frames_second_stat_mean[key] = np.sum(val, axis=0) / len(val)
+            reg_frames_second_stat_num[key] = len(val)
         for i, frame in enumerate(X):
             if label[i] == ' ':
                 if pldaPsi is None:
@@ -134,16 +173,15 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
                     fusion_label = max(cos_sim.items(), key=lambda e: e[1])[0]
                     max_cos_dist = max(cos_sim.items(), key=lambda e: e[1])[1]
                     if max_cos_dist >= 0.6:
-                        VtiEF[i, :] = fusionFactor * reg_frames_mean[fusion_label] + (1 - fusionFactor) * VtiEF[i, :]
+                        VtiEF[i, :] = fusionFactor * reg_frames_second_stat_mean[fusion_label] + (1 - fusionFactor) * VtiEF[i, :]
                 else:
                     plda_sim = dict()
                     for key, val in reg_frames_mean.items():
                         plda_sim[key] = normal_pdf_log(frame, reg_frames_plda_mean[key], reg_frames_plda_cov[key])
                     fusion_label, max_plda = max(plda_sim.items(), key=lambda e: e[1])[0], \
-                                             max(plda_sim.items(), key=lambda e: e[1])[1]
+                                            max(plda_sim.items(), key=lambda e: e[1])[1]
                     if max_plda >= -600:
-                        VtiEF[i, :] = fusionFactor * reg_frames_mean[fusion_label] + (1 - fusionFactor) * VtiEF[i, :]
-    print(VtiEF.shape)
+                        VtiEF[i, :] = fusionFactor * reg_frames_second_stat_mean[fusion_label] + (1 - fusionFactor) * VtiEF[i, :]
 
     Li = [[LL * Fa]] # for the 0-th iteration,
     if ref is not None:
@@ -155,6 +193,41 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
     for ii in range(maxIters):
         L = 0 # objective function (37) (i.e. VB lower-bound on the evidence)
         Ns = gamma.sum(0)                                     # bracket in eq. (34) for all 's'
+        if label is not None and fusionVariable == 'second_stat_iter':
+            if ii == 0:
+                print("here is second_stat_iter")
+            assert VtiEF.shape[0] == label.shape[0], 'Error: second stat shape is not equal to labels'
+            reg_frame_second_stat = dict()
+            for i, frame in enumerate(VtiEF):
+                if not label[i] == ' ':
+                    if label[i] not in reg_frame_second_stat:
+                        reg_frame_second_stat[label[i]] = [frame]
+                    else:
+                        reg_frame_second_stat[label[i]].append(frame)
+            reg_frames_second_stat_mean = dict()
+            reg_frames_second_stat_num = dict()
+            for key, val in reg_frame_second_stat.items():
+                reg_frames_second_stat_mean[key] = np.sum(val, axis=0) / len(val)
+                reg_frames_second_stat_num[key] = len(val)
+            for i, frame in enumerate(X):
+                if label[i] == ' ':
+                    if pldaPsi is None:
+                        cos_sim = dict()
+                        for key, val in reg_frames_mean.items():
+                            cos_sim[key] = np.dot(frame, val) / (np.linalg.norm(frame) * np.linalg.norm(val))
+                        fusion_label = max(cos_sim.items(), key=lambda e: e[1])[0]
+                        max_cos_dist = max(cos_sim.items(), key=lambda e: e[1])[1]
+                        if max_cos_dist >= 0.6:
+                            VtiEF[i, :] = fusionFactor * reg_frames_second_stat_mean[fusion_label] + (1 - fusionFactor) * VtiEF[i, :]
+                    else:
+                        plda_sim = dict()
+                        for key, val in reg_frames_mean.items():
+                            plda_sim[key] = normal_pdf_log(frame, reg_frames_plda_mean[key], reg_frames_plda_cov[key])
+                        fusion_label, max_plda = max(plda_sim.items(), key=lambda e: e[1])[0], \
+                                                max(plda_sim.items(), key=lambda e: e[1])[1]
+                        if max_plda >= -600:
+                            VtiEF[i, :] = fusionFactor * reg_frames_second_stat_mean[fusion_label] + (1 - fusionFactor) * VtiEF[i, :]
+
         VtiEFs = gamma.T.dot(VtiEF)                           # eq. (35) except for \Lambda_s^{-1} for all 's'
         for sid in range(maxSpeakers):
             invL = np.linalg.inv(np.eye(R) + Ns[sid] * VtiEV * Fa / Fb) # eq. (34) inverse

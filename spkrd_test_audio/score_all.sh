@@ -2,6 +2,7 @@
 
 dataset=$1
 ffactor=$2
+fvariable=$3
 
 DATA_DIR=''
 VB_DIR=/home/liaozty20/VBx/VBx
@@ -17,21 +18,21 @@ else
     exit 1
 fi
 
-if [[ -d ${dataset}_sys/rttm_ffactor_${ffactor} ]]; then
+if [[ -d ${dataset}_sys/rttm_ffactor_${ffactor}_${fvariable} ]]; then
     mkdir -p ${dataset}_sys/result
     SYS_RTTM_ALL=${dataset}_sys/result/${dataset}_sys_ffactor_${ffactor}_all.rttm
     REF_RTTM_ALL=${dataset}_sys/result/${dataset}_ref_all.rttm
-    TMP_SYS_FILES=($(ls ${dataset}_sys/rttm_ffactor_${ffactor}))
+    TMP_SYS_FILES=($(ls ${dataset}_sys/rttm_ffactor_${ffactor}_${fvariable}))
     REF_PREFIX=${DATA_DIR}/rttm/
-    SYS_PREFIX=${dataset}_sys/rttm_ffactor_${ffactor}/
+    SYS_PREFIX=${dataset}_sys/rttm_ffactor_${ffactor}_${fvariable}/
     REF_FILES=${TMP_SYS_FILES[@]/#/$REF_PREFIX}
     SYS_FILES=${TMP_SYS_FILES[@]/#/$SYS_PREFIX}
     cat ${SYS_FILES} > ${SYS_RTTM_ALL}
     cat ${REF_FILES} > ${REF_RTTM_ALL}
-    python ${VB_DIR}/../dscore/score.py --collar 0.25 --ignore_overlaps -r ${REF_RTTM_ALL} -s ${SYS_RTTM_ALL} > ${dataset}_sys/result/${dataset}_result_forgiving_${ffactor}
-    python ${VB_DIR}/../dscore/score.py --collar 0.25 -r ${REF_RTTM_ALL} -s ${SYS_RTTM_ALL} > ${dataset}_sys/result/${dataset}_result_fair_${ffactor}
-    python ${VB_DIR}/../dscore/score.py --collar 0.0 -r ${REF_RTTM_ALL} -s ${SYS_RTTM_ALL} > ${dataset}_sys/result/${dataset}_result_full_${ffactor}
+    python ${VB_DIR}/../dscore/score.py --collar 0.25 --ignore_overlaps -r ${REF_RTTM_ALL} -s ${SYS_RTTM_ALL} > ${dataset}_sys/result/${dataset}_result_forgiving_${ffactor}_${fvariable}
+    python ${VB_DIR}/../dscore/score.py --collar 0.25 -r ${REF_RTTM_ALL} -s ${SYS_RTTM_ALL} > ${dataset}_sys/result/${dataset}_result_fair_${ffactor}_${fvariable}
+    python ${VB_DIR}/../dscore/score.py --collar 0.0 -r ${REF_RTTM_ALL} -s ${SYS_RTTM_ALL} > ${dataset}_sys/result/${dataset}_result_full_${ffactor}_${fvariable}
 else
-    echo "${dataset}_sys/rttm_ffactor_${ffactor} not found!"
+    echo "${dataset}_sys/rttm_ffactor_${ffactor}_${fvariable} not found!"
     exit 1
 fi
