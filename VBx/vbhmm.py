@@ -116,8 +116,11 @@ if __name__ == '__main__':
     # read registered segments from .regseg file
     if args.reg_seg_file:
         reg_segs = np.loadtxt(args.reg_seg_file, dtype=str)
-        for i, rs in enumerate(reg_segs):
-            rs[1] = rs[1].astype(float) + rs[0].astype(float)
+        if len(reg_segs.shape) == 1:
+            reg_segs = reg_segs.reshape((1, reg_segs.shape[0]))
+        if reg_segs.size:
+            for i, rs in enumerate(reg_segs):
+                rs[1] = rs[1].astype(float) + rs[0].astype(float)
     else:
         print("Info: registered segments are not given")
 
@@ -130,7 +133,7 @@ if __name__ == '__main__':
         seg_names, xvecs = zip(*segs)
         x = np.array(xvecs)
 
-        if args.reg_seg_file:
+        if args.reg_seg_file and reg_segs.size:
             reg_label = np.array([' '] * x.shape[0])
             for i, reg_and_seg in enumerate(zip(reg_label, seg_names)):
                 cur_label_dur = seg_to_duration_dict[reg_and_seg[1]]
