@@ -85,6 +85,8 @@ def select_register_segments(rttm_content, start, end):
         if rttm_row[3].astype(float) < end and \
             rttm_row[4].astype(float) + rttm_row[3].astype(float) > start:
             rttm_reg_seg.append((rttm_row[3:5].tolist(), rttm_row[7]))
+        if float(rttm_reg_seg[-1][0][0]) + float(rttm_reg_seg[-1][0][1]) > end:
+            rttm_reg_seg[-1][0][1] = f'{end - float(rttm_reg_seg[-1][0][0]): .2f}'
     return rttm_reg_seg
 
 

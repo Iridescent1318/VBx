@@ -19,7 +19,7 @@ else
 fi
 
 if [[ -d ${dataset}_sys/rttm_ffactor_${ffactor}_${fvariable} ]]; then
-    mkdir -p ${dataset}_sys/result
+    mkdir -p ${dataset}_sys/result ${dataset}_sys/result/forgiving ${dataset}_sys/result/fair ${dataset}_sys/result/full
     SYS_RTTM_ALL=${dataset}_sys/result/${dataset}_sys_ffactor_${ffactor}_all.rttm
     REF_RTTM_ALL=${dataset}_sys/result/${dataset}_ref_all.rttm
     TMP_SYS_FILES=($(ls ${dataset}_sys/rttm_ffactor_${ffactor}_${fvariable}))
@@ -29,9 +29,9 @@ if [[ -d ${dataset}_sys/rttm_ffactor_${ffactor}_${fvariable} ]]; then
     SYS_FILES=${TMP_SYS_FILES[@]/#/$SYS_PREFIX}
     cat ${SYS_FILES} > ${SYS_RTTM_ALL}
     cat ${REF_FILES} > ${REF_RTTM_ALL}
-    python ${VB_DIR}/../dscore/score.py --collar 0.25 --ignore_overlaps -r ${REF_RTTM_ALL} -s ${SYS_RTTM_ALL} > ${dataset}_sys/result/${dataset}_result_forgiving_${ffactor}_${fvariable}
-    python ${VB_DIR}/../dscore/score.py --collar 0.25 -r ${REF_RTTM_ALL} -s ${SYS_RTTM_ALL} > ${dataset}_sys/result/${dataset}_result_fair_${ffactor}_${fvariable}
-    python ${VB_DIR}/../dscore/score.py --collar 0.0 -r ${REF_RTTM_ALL} -s ${SYS_RTTM_ALL} > ${dataset}_sys/result/${dataset}_result_full_${ffactor}_${fvariable}
+    python ${VB_DIR}/../dscore/score.py --collar 0.25 --ignore_overlaps -r ${REF_RTTM_ALL} -s ${SYS_RTTM_ALL} > ${dataset}_sys/result/forgiving/${dataset}_result_${ffactor}_${fvariable}.score
+    python ${VB_DIR}/../dscore/score.py --collar 0.25 -r ${REF_RTTM_ALL} -s ${SYS_RTTM_ALL} > ${dataset}_sys/result/fair/${dataset}_result_${ffactor}_${fvariable}.score
+    python ${VB_DIR}/../dscore/score.py --collar 0.0 -r ${REF_RTTM_ALL} -s ${SYS_RTTM_ALL} > ${dataset}_sys/result/full/${dataset}_result_${ffactor}_${fvariable}.score
 else
     echo "${dataset}_sys/rttm_ffactor_${ffactor}_${fvariable} not found!"
     exit 1

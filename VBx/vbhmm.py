@@ -137,17 +137,19 @@ if __name__ == '__main__':
             reg_label = np.array([' '] * x.shape[0])
             for i, reg_and_seg in enumerate(zip(reg_label, seg_names)):
                 cur_label_dur = seg_to_duration_dict[reg_and_seg[1]]
-                max_dur = 0
-                max_label = ' '
+                select_label_dur = []
                 for given_reg in reg_segs:
                     cross_dur = cross_interval_len(
                         [given_reg[0].astype(float), given_reg[1].astype(float)],
                         [cur_label_dur[0], cur_label_dur[1]]
                     )
-                    if cross_dur > max_dur and cross_dur > 1e-3:
-                        max_dur = cross_dur
-                        max_label = given_reg[2]
-                reg_label[i] = max_label
+                    select_label_dur.append((given_reg[2], cross_dur))
+                select_label_dur.sort(key=lambda x: -x[1])
+                if select_label_dur[0][1] >= 1e-2:
+                    if abs(select_label_dur[1][1] - select_label_dur[0][1]) < 0.72:
+                        reg_label[i] = '#'
+                    else:
+                        reg_label[i] = select_label_dur[0][0]
         else:
             reg_label = None
 

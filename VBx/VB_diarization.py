@@ -154,7 +154,7 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
         assert VtiEF.shape[0] == label.shape[0], 'Error: second stat shape is not equal to labels'
         reg_frame_second_stat = dict()
         for i, frame in enumerate(VtiEF):
-            if not label[i] == ' ':
+            if not (label[i] == ' ' or label[i] == '#'):
                 if label[i] not in reg_frame_second_stat:
                     reg_frame_second_stat[label[i]] = [frame]
                 else:
@@ -165,7 +165,7 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
             reg_frames_second_stat_mean[key] = np.sum(val, axis=0) / len(val)
             reg_frames_second_stat_num[key] = len(val)
         for i, frame in enumerate(X):
-            if label[i] == ' ':
+            if label[i] == ' ' or label[i] == '#':
                 if pldaPsi is None:
                     cos_sim = dict()
                     for key, val in reg_frames_mean.items():

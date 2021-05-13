@@ -27,7 +27,6 @@ elif [[ ${dataset} == "amicorpus" ]]; then
     WEIGHTS_DIR=${VB_DIR}/models/ResNet101_16kHz/nnet/raw_81.pth
     XVEC_TRANS_DIR=${VB_DIR}/models/ResNet101_16kHz/transform.h5
     PLDA_DIR=${VB_DIR}/models/ResNet101_16kHz/plda
-    REGSEG_END=30
     VBHMM_FA=0.4
     VBHMM_FB=64
     VBHMM_LOOP=0.65
@@ -53,11 +52,11 @@ python3 select_reg_segs.py -i ${DATA_DIR}/rttm -o ${dataset}_sys/regseg -a regse
 for audio in $(ls ${DATA_DIR}/wav)
 do
     filename=$(echo "${audio}" | cut -f 1 -d '.')
-    echo ${filename} > ${dataset}_sys_${ffactor}_${fvariable}_list.txt
+    echo ${filename} > list/${dataset}_sys_${ffactor}_${fvariable}_list.txt
     if !([ -f ${dataset}_sys/xvector/${filename}.ark ]); then
         echo "X-vectors Extraction Starts: ${filename}"
         # run feature and x-vectors extraction
-        python ${VB_DIR}/predict.py --in-file-list ${dataset}_sys_${ffactor}_${fvariable}_list.txt \
+        python ${VB_DIR}/predict.py --in-file-list list/${dataset}_sys_${ffactor}_${fvariable}_list.txt \
             --in-lab-dir ${DATA_DIR}/labs \
             --in-wav-dir ${DATA_DIR}/wav \
             --out-ark-fn ${dataset}_sys/xvector/${filename}.ark \
