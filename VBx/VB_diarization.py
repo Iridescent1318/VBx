@@ -87,6 +87,7 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
     R = V.shape[0]  # subspace rank
     nframes = X.shape[0]
     print(fusionVariable)
+    plda_thrs = -600
 
     if pi is None:
         pi = np.ones(maxSpeakers) / maxSpeakers
@@ -102,10 +103,10 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
         raise Exception('Wrong fusion variable: only xvector, second_stat and second_stat_iter are supported.')
 
     if label is not None:
-        assert X.shape[0] == label.shape[0], 'Error: segment shape is not equal to labels'
+        assert X.shape[0] == len(label), 'Error: segment shape is not equal to labels'
         registered_frames = dict()
         for i, frame in enumerate(X):
-            if not label[i] == ' ':
+            if not (label[i] == ' ' or label[i] == '#'):
                 if label[i] not in registered_frames:
                     registered_frames[label[i]] = [frame]
                 else:
@@ -124,7 +125,7 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
         
         if fusionVariable == 'xvector':
             for i, frame in enumerate(X):
-                if label[i] == ' ':
+                if label[i] == ' ' or label[i] == '#':
                     if pldaPsi is None:
                         cos_sim = dict()
                         for key, val in reg_frames_mean.items():
@@ -139,7 +140,7 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
                             plda_sim[key] = normal_pdf_log(frame, reg_frames_plda_mean[key], reg_frames_plda_cov[key])
                         fusion_label, max_plda = max(plda_sim.items(), key=lambda e: e[1])[0], \
                                                 max(plda_sim.items(), key=lambda e: e[1])[1]
-                        if max_plda >= -600:
+                        if max_plda >= plda_thrs:
                             X[i, :] = fusionFactor * reg_frames_mean[fusion_label] + (1 - fusionFactor) * X[i, :]
 
     # calculate UBM mixture frame posteriors (i.e. per-frame zero order statistics)
@@ -151,7 +152,7 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
     VtiEF = (X - m).dot(iE.dot(V).T)
 
     if label is not None and fusionVariable == 'second_stat':
-        assert VtiEF.shape[0] == label.shape[0], 'Error: second stat shape is not equal to labels'
+        assert VtiEF.shape[0] == len(label), 'Error: second stat shape is not equal to labels'
         reg_frame_second_stat = dict()
         for i, frame in enumerate(VtiEF):
             if not (label[i] == ' ' or label[i] == '#'):
@@ -180,7 +181,7 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
                         plda_sim[key] = normal_pdf_log(frame, reg_frames_plda_mean[key], reg_frames_plda_cov[key])
                     fusion_label, max_plda = max(plda_sim.items(), key=lambda e: e[1])[0], \
                                             max(plda_sim.items(), key=lambda e: e[1])[1]
-                    if max_plda >= -600:
+                    if max_plda >= plda_thrs:
                         VtiEF[i, :] = fusionFactor * reg_frames_second_stat_mean[fusion_label] + (1 - fusionFactor) * VtiEF[i, :]
 
     Li = [[LL * Fa]] # for the 0-th iteration,
@@ -196,10 +197,10 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
         if label is not None and fusionVariable == 'second_stat_iter':
             if ii == 0:
                 print("here is second_stat_iter")
-            assert VtiEF.shape[0] == label.shape[0], 'Error: second stat shape is not equal to labels'
+            assert VtiEF.shape[0] == len(label), 'Error: second stat shape is not equal to labels'
             reg_frame_second_stat = dict()
             for i, frame in enumerate(VtiEF):
-                if not label[i] == ' ':
+                if not (label[i] == ' ' or label[i] == '#'):
                     if label[i] not in reg_frame_second_stat:
                         reg_frame_second_stat[label[i]] = [frame]
                     else:
@@ -210,7 +211,7 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
                 reg_frames_second_stat_mean[key] = np.sum(val, axis=0) / len(val)
                 reg_frames_second_stat_num[key] = len(val)
             for i, frame in enumerate(X):
-                if label[i] == ' ':
+                if label[i] == ' ' or label[i] == '#':
                     if pldaPsi is None:
                         cos_sim = dict()
                         for key, val in reg_frames_mean.items():
@@ -225,7 +226,7 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
                             plda_sim[key] = normal_pdf_log(frame, reg_frames_plda_mean[key], reg_frames_plda_cov[key])
                         fusion_label, max_plda = max(plda_sim.items(), key=lambda e: e[1])[0], \
                                                 max(plda_sim.items(), key=lambda e: e[1])[1]
-                        if max_plda >= -600:
+                        if max_plda >= plda_thrs:
                             VtiEF[i, :] = fusionFactor * reg_frames_second_stat_mean[fusion_label] + (1 - fusionFactor) * VtiEF[i, :]
 
         VtiEFs = gamma.T.dot(VtiEF)                           # eq. (35) except for \Lambda_s^{-1} for all 's'

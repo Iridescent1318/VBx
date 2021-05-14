@@ -6,6 +6,7 @@ DIR=/home/liaozty20/VBx/spkrd_test_audio/ref
 VB_DIR=/home/liaozty20/VBx/VBx
 
 mkdir -p sys/xvector sys/seg sys/rttm
+rm thrs_*.txt
 
 for audio in $(ls ${DIR}/wav)
 do
@@ -26,38 +27,19 @@ do
         echo "X-vectors Extraction Ends: "${filename}""
     fi
 
-    echo "VB-HMM Starts: "${filename}""
+    echo "EER calc Starts: "${filename}""
     # run variational bayes on top of x-vectors
-    python ${VB_DIR}/vbhmm.py --file-name ${filename} \
-        --init AHC+VB \
-        --out-rttm-dir sys/rttm \
+    python ${VB_DIR}/eer_calc.py --file-name ${filename} \
+        --in-rttm-dir ${DIR}/rttm \
+        --rttm-file ${filename}.rttm \
         --xvec-ark-file sys/xvector/${filename}.ark \
         --segments-file sys/seg/${filename}.seg \
         --xvec-transform ${VB_DIR}/models/ResNet101_8kHz/transform.h5 \
         --plda-file ${VB_DIR}/models/ResNet101_8kHz/plda \
-        --threshold -0.015 \
         --lda-dim 128 \
-        --Fa 0.4 \
-        --Fb 17 \
-        --loopP 0.40 \
-        --fusion-factor 0.002 \
+        --plda-thrs -592 \
         --reg-seg-file sys/regseg/${filename}.regseg \
-        --fusion-variable second_stat_iter
-    echo "VB-HMM Ends: "${filename}""
+        --output-file thrs_592.txt
+    echo "EER calc Ends: "${filename}""
 
-    echo "Scoring Starts: "${filename}""
-    # check if there is ground truth .rttm file
-    REFDIR=ref/rttm/${filename}.rttm
-    SYSDIR=sys/rttm/${filename}.rttm
-    if [ -f $REFDIR ]
-    then
-        # run dscore
-        # forgiving
-        # python ${VB_DIR}/../dscore/score.py -r $REFDIR -s $SYSDIR --collar 0.25 --ignore_overlaps
-        # # fair
-        # python ${VB_DIR}/../dscore/score.py -r $REFDIR -s $SYSDIR --collar 0.25
-        # # full
-        python ${VB_DIR}/../dscore/score.py -r $REFDIR -s $SYSDIR --collar 0.0
-    fi
-    echo "Scoring Ends: "${filename}""
 done

@@ -134,7 +134,7 @@ if __name__ == '__main__':
         x = np.array(xvecs)
 
         if args.reg_seg_file and reg_segs.size:
-            reg_label = np.array([' '] * x.shape[0])
+            reg_label = [' '] * x.shape[0]
             for i, reg_and_seg in enumerate(zip(reg_label, seg_names)):
                 cur_label_dur = seg_to_duration_dict[reg_and_seg[1]]
                 select_label_dur = []
