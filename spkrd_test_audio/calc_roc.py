@@ -17,7 +17,7 @@ def draw_eer_curve(plt, table, legend):
 
 
 def calc_prec_recall(table, n=100, fi=None):
-    max_ll, min_ll = table[:][3].quantile(0.10), table[:][3].quantile(0.9)
+    max_ll, min_ll = table[:][3].max(), table[:][3].min()
     step = (max_ll - min_ll) / (n + 1)
     reg_set = set(table[:][2])
     prec_recall = [[0., 0., 0.] for _ in range(n)]
