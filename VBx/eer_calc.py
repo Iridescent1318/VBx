@@ -61,7 +61,6 @@ if __name__ == '__main__':
                         help='File with PLDA model in Kaldi format used for AHC and VB-HMM x-vector clustering')
     parser.add_argument('--lda-dim', required=True, type=int,
                         help='For VB-HMM, x-vectors are reduced to this dimensionality using LDA')
-    parser.add_argument('--plda-thrs', required=True, type=float, help='plda threshold')
     parser.add_argument('--reg-seg-file', required=False, type=str, default=None,
                         help='File with registered segments, including start, end time and speaker label')
     parser.add_argument('--output-file', required=True, type=str, help='output file')
@@ -170,6 +169,7 @@ if __name__ == '__main__':
                             sys_label[i] = select_label_dur[0][0]
                         else:
                             sys_label[i] = "#"
+            sys_label = sys_label[test_start_pos:]
 
         with h5py.File(args.xvec_transform, 'r') as f:
             mean1 = np.array(f['mean1'])
@@ -200,35 +200,38 @@ if __name__ == '__main__':
                 reg_frames_plda_mean[key] = n * plda_psi / (n * plda_psi + np.ones(D)) * reg_frames_mean[key]
                 reg_frames_plda_cov[key] = np.ones(D) + plda_psi / (n * plda_psi + np.ones(D))
 
-            for i, frame in enumerate(fea):
-                if reg_label[i] == " " or reg_label[i] == "#":
-                    plda_sim = dict()
-                    for key, val in reg_frames_mean.items():
-                        plda_sim[key] = normal_pdf_log(frame, reg_frames_plda_mean[key], reg_frames_plda_cov[key])
-                    fusion_label, max_plda = max(plda_sim.items(), key=lambda e: e[1])[0], \
-                                            max(plda_sim.items(), key=lambda e: e[1])[1]
-                    if max_plda >= args.plda_thrs:
-                        reg_label[i] = fusion_label
+            reg_label = reg_label[test_start_pos:]
+            max_ll = [0.0] * len(reg_label)
+            
+            for i, frame in enumerate(fea[test_start_pos:]):
+                plda_sim = dict()
+                for key, val in reg_frames_mean.items():
+                    plda_sim[key] = normal_pdf_log(frame, reg_frames_plda_mean[key], reg_frames_plda_cov[key])
+                reg_label[i], max_ll[i] = max(plda_sim.items(), key=lambda e: e[1])[0], \
+                                        max(plda_sim.items(), key=lambda e: e[1])[1]
 
-        tp = fp = tn = fn = 0
-        for p in zip(reg_label, sys_label):
-            if p[1] == "#" or p[1] == " ":
-                continue
-            if p[1] in reg_label_set:
-                # y_pred == y_true
-                if p[0] == p[1]:
-                    tp += 1
-                # y_true in reg_labels but y_pred != y_true
-                else:
-                    fn += 1
-            else:
-                # y_true not in reg_labels, neither is y_pred
-                # y_pred can only be ' ' or '#'
-                if p[0] not in reg_label_set:
-                    tn += 1
-                # y_true not in reg_labels, but y_pred is in
-                else:
-                    fp += 1
         with open(args.output_file, 'a') as f:
-            f.write(f"{tp} {fp} {tn} {fn} {tp / (tp + fp)} {tp / (tp + fn)}\n")
+            for p in zip(sys_label, reg_label, max_ll):
+                # if p[1] == "#" or p[1] == " ":
+                #     continue
+                # if p[1] in reg_label_set:
+                #     # y_pred == y_true
+                #     if p[0] == p[1]:
+                #         tp += 1
+                #     # y_true in reg_labels but y_pred != y_true
+                #     else:
+                #         fn += 1
+                # else:
+                #     # y_true not in reg_labels, neither is y_pred
+                #     # y_pred can only be ' ' or '#'
+                #     if p[0] not in reg_label_set:
+                #         tn += 1
+                #     # y_true not in reg_labels, but y_pred is in
+                #     else:
+                #         fp += 1
+                if p[0] == "#" or p[0] == " ":
+                    continue
+                output_str = f'{args.file_name} {p[0]} {p[1]} {p[2]: .2f}' if p[1] != " " else \
+                    f'{args.file_name} {p[0]} [UNKNOWN] {p[2]: .2f}'
+                f.write(output_str + '\n')
         

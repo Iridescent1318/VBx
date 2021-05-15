@@ -4,7 +4,6 @@ dataset=$1
 ffactor=$2
 fvariable=$3
 duration=$4
-plda_thrs=$5
 
 export KALDI_ROOT='/home/liaozty20/kaldi'
 CDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
@@ -16,7 +15,7 @@ WEIGHTS_DIR=${VB_DIR}/models/ResNet101_8kHz/nnet/raw_195.pth
 XVEC_TRANS_DIR=${VB_DIR}/models/ResNet101_8kHz/transform.h5
 PLDA_DIR=${VB_DIR}/models/ResNet101_8kHz/plda
 REGSEG_END=${duration}
-THRS_FILE=thrs/${dataset}_${REGSEG_END}_${plda_thrs}
+THRS_FILE=thrs/${dataset}_${REGSEG_END}
 
 if [[ ${dataset} == "callhome97" ]]; then
     DATA_DIR=/home/liaozty20/callhome97
@@ -76,7 +75,6 @@ do
         --xvec-transform ${XVEC_TRANS_DIR} \
         --plda-file ${PLDA_DIR} \
         --lda-dim 128 \
-        --plda-thrs ${plda_thrs} \
         --reg-seg-file ${dataset}_sys/regseg_${REGSEG_END}/${filename}.regseg \
         --output-file ${THRS_FILE}
     echo "EER calc Ends: "${filename}""

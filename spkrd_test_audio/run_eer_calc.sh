@@ -37,7 +37,6 @@ do
         --xvec-transform ${VB_DIR}/models/ResNet101_8kHz/transform.h5 \
         --plda-file ${VB_DIR}/models/ResNet101_8kHz/plda \
         --lda-dim 128 \
-        --plda-thrs -592 \
         --reg-seg-file sys/regseg/${filename}.regseg \
         --output-file thrs_592.txt
     echo "EER calc Ends: "${filename}""
