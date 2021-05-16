@@ -4,6 +4,7 @@ export KALDI_ROOT='/home/liaozty20/kaldi'
 CDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 DIR=/home/liaozty20/VBx/spkrd_test_audio/ref
 VB_DIR=/home/liaozty20/VBx/VBx
+PLDA_THRS=-622
 
 mkdir -p sys/xvector sys/seg sys/rttm
 
@@ -42,7 +43,8 @@ do
         --loopP 0.40 \
         --fusion-factor 0.002 \
         --reg-seg-file sys/regseg/${filename}.regseg \
-        --fusion-variable second_stat_iter
+        --fusion-variable second_stat_iter \
+        --plda-thrs ${PLDA_THRS}
     echo "VB-HMM Ends: "${filename}""
 
     echo "Scoring Starts: "${filename}""

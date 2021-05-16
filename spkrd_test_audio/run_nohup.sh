@@ -2,7 +2,7 @@
 
 DATASET=(callhome97 callhome2000 amicorpus)
 FFACTOR_X=(0.0 0.05 0.1 0.15 0.02)
-FFACTOR_S=(0.002 0.004 0.006 0.008 0.01)
+FFACTOR_S=(0.002 0.004 0.006 0.008 0.01 0.015 0.02)
 
 for dataset in ${DATASET[@]}
 do

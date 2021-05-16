@@ -37,7 +37,7 @@ from diarization_lib import cos_similarity
 def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters = 10,
                    epsilon = 1e-4, loopProb = 0.99, alphaQInit = 1.0, ref=None,
                    plot=False, minDur=1, Fa=1.0, Fb=1.0, label=None,
-                   fusionFactor=0.0, pldaPsi=None, fusionVariable='xvector'):
+                   fusionFactor=0.0, pldaPsi=None, fusionVariable='xvector', pldaThrs=-600.):
     """
     This is a simplified version of speaker diarization described in:
 
@@ -86,8 +86,6 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
     D = X.shape[1]  # feature dimensionality
     R = V.shape[0]  # subspace rank
     nframes = X.shape[0]
-    print(fusionVariable)
-    plda_thrs = -600
 
     if pi is None:
         pi = np.ones(maxSpeakers) / maxSpeakers
@@ -140,7 +138,7 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
                             plda_sim[key] = normal_pdf_log(frame, reg_frames_plda_mean[key], reg_frames_plda_cov[key])
                         fusion_label, max_plda = max(plda_sim.items(), key=lambda e: e[1])[0], \
                                                 max(plda_sim.items(), key=lambda e: e[1])[1]
-                        if max_plda >= plda_thrs:
+                        if max_plda >= pldaThrs:
                             X[i, :] = fusionFactor * reg_frames_mean[fusion_label] + (1 - fusionFactor) * X[i, :]
 
     # calculate UBM mixture frame posteriors (i.e. per-frame zero order statistics)
@@ -181,7 +179,7 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
                         plda_sim[key] = normal_pdf_log(frame, reg_frames_plda_mean[key], reg_frames_plda_cov[key])
                     fusion_label, max_plda = max(plda_sim.items(), key=lambda e: e[1])[0], \
                                             max(plda_sim.items(), key=lambda e: e[1])[1]
-                    if max_plda >= plda_thrs:
+                    if max_plda >= pldaThrs:
                         VtiEF[i, :] = fusionFactor * reg_frames_second_stat_mean[fusion_label] + (1 - fusionFactor) * VtiEF[i, :]
 
     Li = [[LL * Fa]] # for the 0-th iteration,
@@ -226,7 +224,7 @@ def VB_diarization(X, m, iE, V, pi=None, gamma=None, maxSpeakers = 10, maxIters 
                             plda_sim[key] = normal_pdf_log(frame, reg_frames_plda_mean[key], reg_frames_plda_cov[key])
                         fusion_label, max_plda = max(plda_sim.items(), key=lambda e: e[1])[0], \
                                                 max(plda_sim.items(), key=lambda e: e[1])[1]
-                        if max_plda >= plda_thrs:
+                        if max_plda >= pldaThrs:
                             VtiEF[i, :] = fusionFactor * reg_frames_second_stat_mean[fusion_label] + (1 - fusionFactor) * VtiEF[i, :]
 
         VtiEFs = gamma.T.dot(VtiEF)                           # eq. (35) except for \Lambda_s^{-1} for all 's'

@@ -17,11 +17,14 @@ REGSEG_END=15
 VBHMM_FA=0.4
 VBHMM_FB=17
 VBHMM_LOOP=0.40
+PLDA_THRS=-600
 
 if [[ ${dataset} == "callhome97" ]]; then
     DATA_DIR=/home/liaozty20/callhome97
+    PLDA_THRS=-700
 elif [[ ${dataset} == "callhome2000" ]]; then
     DATA_DIR=/home/liaozty20/callhome2000
+    PLDA_THRS=-622
 elif [[ ${dataset} == "amicorpus" ]]; then
     DATA_DIR=/home/liaozty20/amicorpus
     WEIGHTS_DIR=${VB_DIR}/models/ResNet101_16kHz/nnet/raw_81.pth
@@ -30,6 +33,7 @@ elif [[ ${dataset} == "amicorpus" ]]; then
     VBHMM_FA=0.4
     VBHMM_FB=64
     VBHMM_LOOP=0.65
+    PLDA_THRS=-413
 else
     echo "Wrong dataset. Only callhome97, callhome2000, amicorpus are supported."
     exit 1
@@ -44,6 +48,7 @@ echo "regseg_end: ${REGSEG_END}"
 echo "vbhmm_Fa: ${VBHMM_FA}"
 echo "vbhmm_Fb: ${VBHMM_FB}"
 echo "vbhmm_loop: ${VBHMM_LOOP}"
+echo "plda_thrs: ${PLDA_THRS}"
 
 mkdir -p ${dataset}_sys/xvector ${dataset}_sys/seg ${dataset}_sys/rttm_ffactor_${ffactor}_${fvariable} ${dataset}_sys/regseg
 
@@ -84,7 +89,8 @@ do
         --loopP ${VBHMM_LOOP} \
         --fusion-factor ${ffactor} \
         --reg-seg-file ${dataset}_sys/regseg/${filename}.regseg \
-        --fusion-variable ${fvariable}
+        --fusion-variable ${fvariable} \
+        --plda-thrs ${PLDA_THRS}
     echo "VB-HMM Ends: ${filename}"
 
     echo "Scoring Starts: ${filename}"

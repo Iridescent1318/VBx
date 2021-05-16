@@ -94,6 +94,7 @@ if __name__ == '__main__':
                         help='The hyperparameter controlling fusion of xvecs')
     parser.add_argument('--replace-label', required=False, type=bool, default=False)
     parser.add_argument('--fusion-variable', required=False, type=str, default='xvector')
+    parser.add_argument('--plda-thrs', required=False, type=float, default=-600)
 
     args = parser.parse_args()
     assert 0 <= args.loopP <= 1, f'Expecting loopP between 0 and 1, got {args.loopP} instead.'
@@ -187,7 +188,8 @@ if __name__ == '__main__':
                     maxIters=40, epsilon=1e-6, 
                     loopProb=args.loopP, Fa=args.Fa, Fb=args.Fb,
                     label=reg_label, fusionFactor=args.fusion_factor, 
-                    pldaPsi=plda_psi, fusionVariable=args.fusion_variable)
+                    pldaPsi=plda_psi, fusionVariable=args.fusion_variable,
+                    pldaThrs=args.plda_thrs)
 
                 labels1st = np.argsort(-q, axis=1)[:, 0]
                 spk_to_clus_lab = dict()
